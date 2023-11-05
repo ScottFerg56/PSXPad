@@ -164,7 +164,8 @@ void DBAnalog(PadKeys btn, Point p)
     tft.setCursor(0, 280);
     tft.setTextSize(2);
     tft.fillRect(0, 280, 24 * 12, 280+16, HX8357_BLUE);
-    tft.printf("%10s x:%4i y:%4i", psxButtonNames[(int)btn], p.x, p.y);
+    TFTpreMsg();
+    tft.printf("%10s x:%4i y:%4i\r\n", psxButtonNames[(int)btn], p.x, p.y);
     DBButtonPress(btn, p.x != 0 || p.y != 0);
 }
 
