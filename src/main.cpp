@@ -6,25 +6,11 @@
 #include <Wire.h>
 #include "ScaledKnob.h"
 #include "PSXPad.h"
+#include "\Projects\Rovio\RovioMotor\include\Packet.h"
 
 // E8:9F:6D:22:02:EC
 
-uint8_t broadcastAddress[]
-     = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
-    // {0xE8, 0x9F, 0x6D, 0x32, 0xDE, 0x2C};
-
-bool btnPressed;
-
-// Variable to store if sending data was successful
-String success;
-
-typedef struct struct_message
-{
-    bool btnPressed;
-} struct_message;
-
-struct_message packetOut;
-struct_message packetIn;
+uint8_t broadcastAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
 
 esp_now_peer_info_t peerInfo;
 
@@ -45,10 +31,10 @@ TS_Point lastTSpt;
 Adafruit_seesaw SeeSaw;
 seesaw_NeoPixel SSPixel = seesaw_NeoPixel(4, 18, NEO_GRB + NEO_KHZ800);
 
-ScaledKnob Knob0(0, 12, 0, 100, 1);
-ScaledKnob Knob1(1, 14, 0, 100, 1);
-ScaledKnob Knob2(2, 17, 0, 100, 1);
-ScaledKnob Knob3(3,  9, 0, 100, 1);
+ScaledKnob Knob0(0, 12, -100, 100, 5);
+ScaledKnob Knob1(1, 14, -100, 100, 5);
+ScaledKnob Knob2(2, 17, -100, 100, 5);
+ScaledKnob Knob3(3,  9, -100, 100, 5);
 
 float valKnob0;
 float valKnob1;
@@ -95,19 +81,34 @@ void TFTpreMsg()
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
-    Serial.print("\r\nLast packetOut Send Status:\t");
-    Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-    if (status == 0)
-        success = "Delivery Success";
-    else
-        success = "Delivery Fail";
+    if (status != ESP_NOW_SEND_SUCCESS)
+        Serial.println("Delivery Fail");
 }
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)
 {
-    memcpy(&packetIn, incomingData, sizeof(packetIn));
+    if (len == 0 || (len & 1) != 0)
+    {
+        Serial.println("invalid data packet length");
+        return;
+    }
     TFTpreMsg();
-    tft.printf("Bytes received: %i\r\n", len);
+    for (size_t i = 0; i < len; i += 2)
+    {
+        switch ((PacketCmds)incomingData[i*2])
+        {
+        case CmdLeftMotorRPM:
+            tft.printf("Left:%4i ", (int8_t)incomingData[i*2+1]);
+            break;
+        case CmdRightMotorRPM:
+            tft.printf("Right:%4i ", (int8_t)incomingData[i*2+1]);
+            break;
+        case CmdRearMotorRPM:
+            tft.printf("Rear:%4i ", (int8_t)incomingData[i*2+1]);
+            break;
+        }
+    }
+    tft.println();
 }
 
 extern void DBinit();
@@ -181,6 +182,27 @@ void processKnob(ScaledKnob& knob, int id, float& value)
         tft.fillRect(0, 280, 24 * 12, 280+16, HX8357_BLUE);
         TFTpreMsg();
         tft.printf("knob %i v:%4.0f\r\n", id, v);
+        int8_t packet[2];
+        packet[0] = CmdNone;
+        packet[1] = (int8_t)value;
+        switch (id)
+        {
+        case 0:
+            packet[0] = CmdLeftMotorGoal;
+            break;
+        case 1:
+            packet[0] = CmdRightMotorGoal;
+            break;
+        case 2:
+            packet[0] = CmdRearMotorGoal;
+            break;
+        }
+        if (packet[0] != CmdNone)
+        {
+            esp_err_t result = esp_now_send(broadcastAddress, (uint8_t*)&packet, 2);
+            if (result != ESP_OK)
+                Serial.println("Error sending the data");
+        }
     }
 }
 
@@ -290,16 +312,6 @@ void loop()
                 {
                     bool pressed = (btns & msk) != 0;
                     DBButtonPress(i, pressed);
-                    if (i == PadKeys_select)
-                    {
-                        packetOut.btnPressed = pressed;
-                        esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &packetOut, sizeof(packetOut));
-                        TFTpreMsg();
-                        if (result == ESP_OK)
-                            tft.println("Sent with success");
-                        else
-                            tft.println("Error sending the data");
-                    }
                     if (i == PadKeys_start && pressed)
                     {
                         Serial.println(WiFi.macAddress());
