@@ -6,11 +6,15 @@
 #include <Wire.h>
 #include "ScaledKnob.h"
 #include "PSXPad.h"
-#include "\Projects\Rovio\RovioMotor\include\Packet.h"
+#include "Packet.h"
+#include "VirtualMotor.H"
+#include "Flogger.h"
 
 // E8:9F:6D:22:02:EC
 
 uint8_t broadcastAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
+
+VirtualMotor Motors[3];
 
 esp_now_peer_info_t peerInfo;
 
@@ -41,22 +45,15 @@ float valKnob1;
 float valKnob2;
 float valKnob3;
 
-void msg(const char *msg)
+int flog_printer(const char* s)
 {
-    Serial.print(msg);
-    tft.print(msg);
-}
-
-void msgln(const char *msg)
-{
-    Serial.println(msg);
-    tft.println(msg);
+    Serial.print(s);
+    return tft.print(s);
 }
 
 void err(const char *msg)
 {
-    Serial.println(msg);
-    tft.println(msg);
+    flogd("%s", msg);
     while (1)
         ;
 }
@@ -82,33 +79,39 @@ void TFTpreMsg()
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
     if (status != ESP_NOW_SEND_SUCCESS)
-        Serial.println("Delivery Fail");
+        flogd("Delivery Fail");
 }
 
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)
+void OnDataRecv(const uint8_t * mac, const uint8_t *pData, int len)
 {
     if (len == 0 || (len & 1) != 0)
     {
-        Serial.println("invalid data packet length");
+        flogd("invalid data packet length");
         return;
     }
-    TFTpreMsg();
-    for (size_t i = 0; i < len; i += 2)
+    while (len > 0)
     {
-        switch ((PacketCmds)incomingData[i*2])
+        int8_t entity = (*pData & 0xF0) >> 4;
+        int8_t property = *pData++ & 0x0F;
+        int8_t value = *pData++;
+        len -= 2;
+        switch (entity)
         {
-        case CmdLeftMotorRPM:
-            tft.printf("Left:%4i ", (int8_t)incomingData[i*2+1]);
+        case Entities_LeftMotor:
+        case Entities_RightMotor:
+        case Entities_RearMotor:
+            Motors[entity].SetProperty((MotorProperties)property, value);
             break;
-        case CmdRightMotorRPM:
-            tft.printf("Right:%4i ", (int8_t)incomingData[i*2+1]);
+
+        case Entities_AllMotors:
+            for (int8_t e = Entities_LeftMotor; e <= Entities_RearMotor; e++)
+                Motors[e-Entities_LeftMotor].SetProperty((MotorProperties)property, value);
             break;
-        case CmdRearMotorRPM:
-            tft.printf("Rear:%4i ", (int8_t)incomingData[i*2+1]);
+        
+        default:    // invalid enity
             break;
         }
     }
-    tft.println();
 }
 
 extern void DBinit();
@@ -119,21 +122,21 @@ bool PSXinit()
 {
     if (psx.begin())
     {
-        msgln("Controller found!");
+        flogd("Controller found!");
         delay(300);
         if (!psx.enterConfigMode())
         {
-            msgln("Cannot enter config mode");
+            flogd("Cannot enter config mode");
             return true;
         }
         if (!psx.enableAnalogSticks())
-            msgln("Cannot enable analog sticks");
+            flogd("Cannot enable analog sticks");
 
         if (!psx.enableAnalogButtons())
-            msgln("Cannot enable analog buttons");
+            flogd("Cannot enable analog buttons");
 
         if (!psx.exitConfigMode())
-            Serial.println("Cannot exit config mode");
+            flogd("Cannot exit config mode");
         return true;
     }
     return false;
@@ -170,68 +173,66 @@ bool ProcessStickXY(Point &p, byte x, byte y)
 
 void processKnob(ScaledKnob& knob, int id, float& value)
 {
-    knob.Sample();
+    float v = 0;
     if (knob.Pressed() == ScaledKnob::Presses::Press)
+    {
         knob.SetValue(0);
-    float v = knob.GetValue();
+    }
+    else
+    {
+        knob.Sample();
+        v = knob.GetValue();
+    }
     if (v != value)
     {
         value = v;
-        tft.setCursor(0, 280);
-        tft.setTextSize(2);
-        tft.fillRect(0, 280, 24 * 12, 280+16, HX8357_BLUE);
         TFTpreMsg();
-        tft.printf("knob %i v:%4.0f\r\n", id, v);
-        int8_t packet[2];
-        packet[0] = CmdNone;
-        packet[1] = (int8_t)value;
-        switch (id)
+        tft.printf("%s Goal -> %4i\r\n", Motors[id].Name, (int)value);
+        if (id < 3)
         {
-        case 0:
-            packet[0] = CmdLeftMotorGoal;
-            break;
-        case 1:
-            packet[0] = CmdRightMotorGoal;
-            break;
-        case 2:
-            packet[0] = CmdRearMotorGoal;
-            break;
-        }
-        if (packet[0] != CmdNone)
-        {
+            int8_t packet[2];
+            packet[0] = (Entities_LeftMotor + id) << 4 | MotorProperties_Goal;
+            packet[1] = (int8_t)value;
             esp_err_t result = esp_now_send(broadcastAddress, (uint8_t*)&packet, 2);
             if (result != ESP_OK)
-                Serial.println("Error sending the data");
+                flogd("Error sending the data");
         }
     }
 }
 
 void setup(void)
 {
+    FLogger::SetPrinter(&flog_printer);
     led.config(OUTPUT, HIGH);
     Serial.begin(115200);
     delay(2000);
+
+    Motors[0].Name = "Left Motor";
+    Motors[1].Name = "Right Motor";
+    Motors[2].Name = "Rear Motor";
+
     tft.begin(); // Initialize screen
     tft.setRotation(1);
     tft.fillScreen(HX8357_BLACK);
-    msgln("TFT init");
+    tft.setTextSize(2);
+    flogd("TFT init");
 
-    msgln("Touchscreen init");
+    flogd("Touchscreen init");
     if (!ts.begin())
         err("FAILED");
 
     haveController = PSXinit();
 
     // ESP32 requires 25 MHz limit
-    msgln("SD init");
+    flogd("SD init");
     if (!SD.begin(SD_CS, SD_SCK_MHZ(25)))
         err("FAILED");
 
-    msgln("WIFI init");
+    flogd("WIFI init");
     if (!WiFi.mode(WIFI_STA))
         err("FAILED");
 
-    msgln("ESP_NOW init");
+    flogd("ESP_NOW init");
     if (esp_now_init() != ESP_OK)
         err("FAILED");
 
@@ -244,7 +245,7 @@ void setup(void)
         err("Failed to add peer");
     
     esp_now_register_recv_cb(OnDataRecv);
-    msgln("SeeSaw init");
+    flogd("SeeSaw init");
     if (!SeeSaw.begin(0x49) || !SSPixel.begin(0x49))
         err("FAILED");
 
@@ -260,7 +261,10 @@ void setup(void)
     Knob2.SetColor(  0,   0, 128);
     Knob3.SetColor(128,   0, 128);
 
-    msgln("OK");
+    //ESP_LOGD("main", "setup completed");
+    flogd("completed");
+    flogd("OK");
+    delay(2000);
     tft.fillScreen(HX8357_BLUE);
     tft.setCursor(0, 280);
     DBinit();
@@ -295,7 +299,7 @@ void loop()
     }
     if (!psx.read())
     {
-        msgln("Controller lost");
+        flogd("Controller lost");
         haveController = false;
     }
     else
@@ -314,7 +318,7 @@ void loop()
                     DBButtonPress(i, pressed);
                     if (i == PadKeys_start && pressed)
                     {
-                        Serial.println(WiFi.macAddress());
+                        flogd("MAC addr: %s", WiFi.macAddress());
                     }
                 }
                 msk <<= 1;

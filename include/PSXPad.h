@@ -30,9 +30,6 @@ struct Point
 
 const int16_t deadzone = 20;
 
-void msg(const char *msg);
-void msgln(const char *msg);
-void err(const char *msg);
 void TFTpreMsg();
 
 enum PadKeys
