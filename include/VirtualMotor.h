@@ -1,17 +1,18 @@
 #ifndef VirtualMotor_h
 #define VirtualMotor_h
 
-#include "Packet.h"
+#include "\Projects\Rovio\RovioMotor\include\Packet.h"
 
 class VirtualMotor : Entity
 {
 public:
-    float SpeedGoal = 0;
+    int8_t Goal = 0;
     bool DirectDrive = false;
-    float RPM = 0;
+    int8_t RPM = 0;
     const char* Name;
 
     void SetProperty(int8_t property, int8_t value);
+    int8_t GetProperty(int8_t property);
 };
 
 #endif

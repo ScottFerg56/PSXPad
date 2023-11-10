@@ -6,25 +6,38 @@ void VirtualMotor::SetProperty(int8_t property, int8_t value)
     switch (property)
     {
     case MotorProperties_Goal:
-        SpeedGoal = value;
-        TFTpreMsg();
-        tft.printf("%s Goal: %4i\r\n", Name, (int)SpeedGoal);
+        Goal = value;
         break;
 
     case MotorProperties_RPM:
         RPM = value;
-        TFTpreMsg();
-        tft.printf("%s RPM: %4i\r\n", Name, (int)RPM);
         break;
     
     case MotorProperties_DirectDrive:
         DirectDrive = value != 0;
-        TFTpreMsg();
-        tft.printf("%s DirectDrive: %s\r\n", Name, DirectDrive ? "ON" : "OFF");
         break;
 
     default:                    // invalid property
         // UNDONE: error reporting
         break;
+    }
+}
+
+int8_t VirtualMotor::GetProperty(int8_t property)
+{
+    switch (property)
+    {
+    case MotorProperties_Goal:
+        return (int)Goal;
+
+    case MotorProperties_RPM:
+        return (int)RPM;
+    
+    case MotorProperties_DirectDrive:
+        return (int)DirectDrive;
+
+    default:                    // invalid property
+        // UNDONE: error reporting
+        return -1;
     }
 }

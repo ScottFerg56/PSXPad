@@ -6,8 +6,8 @@
 #include <Wire.h>
 #include "ScaledKnob.h"
 #include "PSXPad.h"
-#include "Packet.h"
-#include "VirtualMotor.H"
+#include "\Projects\Rovio\RovioMotor\include\Packet.h"
+#include "VirtualMotor.h"
 #include "Flogger.h"
 
 // E8:9F:6D:22:02:EC
@@ -15,6 +15,12 @@
 uint8_t broadcastAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
 
 VirtualMotor Motors[3];
+const char* MotorPropertiesName[] =
+{
+    "Goal",
+    "RPM",
+    "DirectDrive",
+};
 
 esp_now_peer_info_t peerInfo;
 
@@ -100,7 +106,7 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *pData, int len)
         case Entities_LeftMotor:
         case Entities_RightMotor:
         case Entities_RearMotor:
-            Motors[entity].SetProperty((MotorProperties)property, value);
+            Motors[entity-Entities_LeftMotor].SetProperty((MotorProperties)property, value);
             break;
 
         case Entities_AllMotors:
@@ -186,8 +192,6 @@ void processKnob(ScaledKnob& knob, int id, float& value)
     if (v != value)
     {
         value = v;
-        TFTpreMsg();
-        tft.printf("%s Goal -> %4i\r\n", Motors[id].Name, (int)value);
         if (id < 3)
         {
             int8_t packet[2];
@@ -196,6 +200,7 @@ void processKnob(ScaledKnob& knob, int id, float& value)
             esp_err_t result = esp_now_send(broadcastAddress, (uint8_t*)&packet, 2);
             if (result != ESP_OK)
                 flogd("Error sending the data");
+            Motors[id].Goal = (int8_t)value;
         }
     }
 }
@@ -270,74 +275,90 @@ void setup(void)
     DBinit();
 }
 
+unsigned long timeInputLast = 0;
+unsigned long timePlotLast = 0;
+
 void loop()
 {
-    // Retrieve a point  
-    if (!ts.bufferEmpty())
+    unsigned long msec = millis();
+    unsigned long dmsec = msec - timeInputLast;
+    if (dmsec >= 20)
     {
-        TS_Point p = ts.getPoint();
-        if (p != lastTSpt)
+        timeInputLast = msec;
+        if (!ts.bufferEmpty())
         {
-            lastTSpt = p;
-            // flip X and Y for the current rotation
-            int16_t x = p.y;
-            int16_t y = p.x;
-            // Scale to tft.width using the calibration #'s
-            x = map(x, calib[0], calib[1], 0, tft.width());
-            y = map(y, calib[2], calib[3], 0, tft.height());
-            // invert Y axis
-            y = tft.height() - y;
-            tft.fillCircle(x, y, 3, HX8357_MAGENTA);
-            //Serial.print("("); Serial.print(p.x); Serial.print(","); Serial.print(p.y); Serial.println(")");
-        }
-    }
-    if (!haveController)
-    {
-        haveController = PSXinit();
-        if (!haveController)
-            return;
-    }
-    if (!psx.read())
-    {
-        flogd("Controller lost");
-        haveController = false;
-    }
-    else
-    {
-        PsxButtons btns = psx.getButtonWord();
-
-        PsxButtons chg = btns ^ lastBtns;
-        if (chg != 0)
-        {
-            PsxButtons msk = 1;
-            for (PadKeys i = PadKeys_select; i <= PadKeys_square; ++i)
+            TS_Point p = ts.getPoint();
+            if (p != lastTSpt)
             {
-                if (chg & msk)
-                {
-                    bool pressed = (btns & msk) != 0;
-                    DBButtonPress(i, pressed);
-                    if (i == PadKeys_start && pressed)
-                    {
-                        flogd("MAC addr: %s", WiFi.macAddress());
-                    }
-                }
-                msk <<= 1;
+                lastTSpt = p;
+                // flip X and Y for the current rotation
+                int16_t x = p.y;
+                int16_t y = p.x;
+                // Scale to tft.width using the calibration #'s
+                x = map(x, calib[0], calib[1], 0, tft.width());
+                y = map(y, calib[2], calib[3], 0, tft.height());
+                // invert Y axis
+                y = tft.height() - y;
+                tft.fillCircle(x, y, 3, HX8357_MAGENTA);
+                //Serial.print("("); Serial.print(p.x); Serial.print(","); Serial.print(p.y); Serial.println(")");
             }
         }
-        lastBtns = btns;
+        if (!haveController)
+        {
+            haveController = PSXinit();
+            if (!haveController)
+                return;
+        }
+        if (!psx.read())
+        {
+            flogd("Controller lost");
+            haveController = false;
+        }
+        else
+        {
+            PsxButtons btns = psx.getButtonWord();
 
-        byte x, y;
-        psx.getLeftAnalog(x, y);
-        if (ProcessStickXY(lastLeftStick, x, y))
-            DBAnalog(PadKeys_leftStick, lastLeftStick);
-        psx.getRightAnalog(x, y);
-        if (ProcessStickXY(lastRightStick, x, y))
-            DBAnalog(PadKeys_rightStick, lastRightStick);
+            PsxButtons chg = btns ^ lastBtns;
+            if (chg != 0)
+            {
+                PsxButtons msk = 1;
+                for (PadKeys i = PadKeys_select; i <= PadKeys_square; ++i)
+                {
+                    if (chg & msk)
+                    {
+                        bool pressed = (btns & msk) != 0;
+                        DBButtonPress(i, pressed);
+                        if (i == PadKeys_start && pressed)
+                        {
+                            flogd("MAC addr: %s", WiFi.macAddress());
+                        }
+                    }
+                    msk <<= 1;
+                }
+            }
+            lastBtns = btns;
+
+            byte x, y;
+            psx.getLeftAnalog(x, y);
+            if (ProcessStickXY(lastLeftStick, x, y))
+                DBAnalog(PadKeys_leftStick, lastLeftStick);
+            psx.getRightAnalog(x, y);
+            if (ProcessStickXY(lastRightStick, x, y))
+                DBAnalog(PadKeys_rightStick, lastRightStick);
+        }
+        processKnob(Knob0, 0, valKnob0);
+        processKnob(Knob1, 1, valKnob1);
+        processKnob(Knob2, 2, valKnob2);
+        processKnob(Knob3, 3, valKnob3);
     }
-    processKnob(Knob0, 0, valKnob0);
-    processKnob(Knob1, 1, valKnob1);
-    processKnob(Knob2, 2, valKnob2);
-    processKnob(Knob3, 3, valKnob3);
-
-    delay(1000 / 60);
+    dmsec = msec - timePlotLast;
+    if (dmsec >= 1000)
+    {
+        timePlotLast = msec;
+        for (int8_t e = Entities_LeftMotor; e <= Entities_RearMotor; e++)
+        {
+            plot(Motors[e-Entities_LeftMotor].Name, MotorPropertiesName[MotorProperties_Goal], Motors[e-Entities_LeftMotor].Goal);
+            plot(Motors[e-Entities_LeftMotor].Name, MotorPropertiesName[MotorProperties_RPM], Motors[e-Entities_LeftMotor].RPM);
+        }
+    }
 }
