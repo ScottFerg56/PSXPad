@@ -1,0 +1,21 @@
+UI Pages:
+    Echo - echoes PSX & knobs; (menu) option to passthru to robot
+    Log - just output log messages - always passthru
+    Telemetry - always passthru - feedback from robot:
+        motors Goal & RPM
+        direct drive
+        head position
+        feedback on control mode(s) from robot controller
+        voltages
+        sensors:
+            nose distance
+            nose IR sensor (?)
+
+robot controller:
+    drive
+    translate
+    rotate
+    head up/down
+    headlights
+    top lights
+    camera

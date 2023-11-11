@@ -1,31 +1,15 @@
 #include <SdFat.h>                // SD card & FAT filesystem library
 #include <Adafruit_SPIFlash.h>    // SPI / QSPI flash library
 #include <DigitalPin.h>
-#include <esp_now.h>
-#include <WiFi.h>
 #include <Wire.h>
 #include "ScaledKnob.h"
 #include "PSXPad.h"
-#include "\Projects\Rovio\RovioMotor\include\Packet.h"
-#include "VirtualMotor.h"
+#include "VirtualBot.h"
 #include "Flogger.h"
-
-#define plot(name1, name2, v) do {} while(0)
-//#define plot(name1, name2, v) Serial.printf(">%s %s:%i\r\n", name1, name2, (int)(v))
 
 // E8:9F:6D:22:02:EC
 
-uint8_t broadcastAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
-
-VirtualMotor Motors[3];
-const char* MotorPropertiesName[] =
-{
-    "Goal",
-    "RPM",
-    "DirectDrive",
-};
-
-esp_now_peer_info_t peerInfo;
+uint8_t botMacAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
 
 DigitalPin<LED_BUILTIN> led;
 
@@ -84,44 +68,6 @@ void TFTpreMsg()
     {
         tft.setTextSize(2); // 12x16 characters
         tft.fillRect(0, y, 26 * 12, 280+16, HX8357_BLUE);
-    }
-}
-
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
-{
-    if (status != ESP_NOW_SEND_SUCCESS)
-        flogw("Delivery Fail");
-}
-
-void OnDataRecv(const uint8_t * mac, const uint8_t *pData, int len)
-{
-    if (len == 0 || (len & 1) != 0)
-    {
-        floge("invalid data packet length");
-        return;
-    }
-    while (len > 0)
-    {
-        int8_t entity = (*pData & 0xF0) >> 4;
-        int8_t property = *pData++ & 0x0F;
-        int8_t value = *pData++;
-        len -= 2;
-        switch (entity)
-        {
-        case Entities_LeftMotor:
-        case Entities_RightMotor:
-        case Entities_RearMotor:
-            Motors[entity-Entities_LeftMotor].SetProperty((MotorProperties)property, value);
-            break;
-
-        case Entities_AllMotors:
-            for (int8_t e = Entities_LeftMotor; e <= Entities_RearMotor; e++)
-                Motors[e-Entities_LeftMotor].SetProperty((MotorProperties)property, value);
-            break;
-        
-        default:    // invalid enity
-            break;
-        }
     }
 }
 
@@ -195,13 +141,7 @@ void processKnob(ScaledKnob& knob, int id, float& value)
         value = v;
         if (id < 3)
         {
-            int8_t packet[2];
-            packet[0] = (Entities_LeftMotor + id) << 4 | MotorProperties_Goal;
-            packet[1] = (int8_t)value;
-            esp_err_t result = esp_now_send(broadcastAddress, (uint8_t*)&packet, 2);
-            if (result != ESP_OK)
-                floge("Error sending the data");
-            Motors[id].Goal = (int8_t)value;
+            VirtualBot::setEntityProperty(Entities_LeftMotor + id, MotorProperties_Goal, (int8_t)value);
         }
     }
 }
@@ -213,10 +153,6 @@ void setup(void)
     led.config(OUTPUT, HIGH);
     Serial.begin(115200);
     delay(2000);
-
-    Motors[0].Name = "Left Motor";
-    Motors[1].Name = "Right Motor";
-    Motors[2].Name = "Rear Motor";
 
     tft.begin(); // Initialize screen
     tft.setRotation(1);
@@ -235,26 +171,11 @@ void setup(void)
     if (!SD.begin(SD_CS, SD_SCK_MHZ(25)))
         flogf("%s FAILED", "SD init");
 
-    flogi("WIFI init");
-    if (!WiFi.mode(WIFI_STA))
-        flogf("%s FAILED", "WIFI init");
-
-    flogi("ESP_NOW init");
-    if (esp_now_init() != ESP_OK)
-        flogf("%s FAILED", "ESP_NOW init");
-
-    esp_now_register_send_cb(OnDataSent);
-
-    memcpy(peerInfo.peer_addr, broadcastAddress, 6);
-    peerInfo.channel = 0;  
-    peerInfo.encrypt = false;
-    if (esp_now_add_peer(&peerInfo) != ESP_OK)
-        flogf("%s FAILED", "ESP_NOW peer add");
-    
-    esp_now_register_recv_cb(OnDataRecv);
     flogi("SeeSaw init");
     if (!SeeSaw.begin(0x49) || !SSPixel.begin(0x49))
         flogf("%s FAILED", "SeeSaw init");
+
+    VirtualBot::init(botMacAddress);
 
     SSPixel.setBrightness(50);
 
@@ -329,10 +250,6 @@ void loop()
                     {
                         bool pressed = (btns & msk) != 0;
                         DBButtonPress(i, pressed);
-                        if (i == PadKeys_start && pressed)
-                        {
-                            flogi("MAC addr: %s", WiFi.macAddress());
-                        }
                     }
                     msk <<= 1;
                 }
@@ -351,15 +268,13 @@ void loop()
         processKnob(Knob1, 1, valKnob1);
         processKnob(Knob2, 2, valKnob2);
         processKnob(Knob3, 3, valKnob3);
+
+        VirtualBot::flush();
     }
     dmsec = msec - timePlotLast;
     if (dmsec >= 1000)
     {
         timePlotLast = msec;
-        for (int8_t e = Entities_LeftMotor; e <= Entities_RearMotor; e++)
-        {
-            plot(Motors[e-Entities_LeftMotor].Name, MotorPropertiesName[MotorProperties_Goal], Motors[e-Entities_LeftMotor].Goal);
-            plot(Motors[e-Entities_LeftMotor].Name, MotorPropertiesName[MotorProperties_RPM], Motors[e-Entities_LeftMotor].RPM);
-        }
+        VirtualBot::doplot();
     }
 }

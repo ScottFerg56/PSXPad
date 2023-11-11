@@ -1,20 +1,20 @@
 #include "VirtualMotor.h"
-#include "PSXPad.h"
+//#include "PSXPad.h"
 
-void VirtualMotor::SetProperty(int8_t property, int8_t value)
+void VirtualMotor::setProperty(int8_t property, int8_t value)
 {
     switch (property)
     {
     case MotorProperties_Goal:
-        Goal = value;
+        setGoal(value);
         break;
 
     case MotorProperties_RPM:
-        RPM = value;
+        setRPM(value);
         break;
     
     case MotorProperties_DirectDrive:
-        DirectDrive = value != 0;
+        setDirectDrive(value != 0);
         break;
 
     default:                    // invalid property
@@ -23,21 +23,47 @@ void VirtualMotor::SetProperty(int8_t property, int8_t value)
     }
 }
 
-int8_t VirtualMotor::GetProperty(int8_t property)
+int8_t VirtualMotor::getProperty(int8_t property)
 {
     switch (property)
     {
     case MotorProperties_Goal:
-        return (int)Goal;
+        return Goal;
 
     case MotorProperties_RPM:
-        return (int)RPM;
+        return RPM;
     
     case MotorProperties_DirectDrive:
-        return (int)DirectDrive;
+        return (int8_t)DirectDrive;
 
     default:                    // invalid property
         // UNDONE: error reporting
         return -1;
     }
+}
+
+bool VirtualMotor::getPropertyChanged(int8_t property)
+{
+    bool changed = false;
+    switch (property)
+    {
+    case MotorProperties_Goal:
+        changed = GoalChanged;
+        GoalChanged = false;
+        break;
+
+    case MotorProperties_RPM:
+        changed = RPMChanged;
+        RPMChanged = false;
+        break;
+    
+    case MotorProperties_DirectDrive:
+        changed = DirectDriveChanged;
+        DirectDriveChanged = false;
+        break;
+
+    default:                    // invalid property
+        break;
+    }
+    return changed;
 }

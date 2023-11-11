@@ -7,6 +7,9 @@
 #include <Adafruit_ImageReader.h> // Image-reading functions
 #include <PsxControllerBitBang.h>
 
+//#define plot(name1, name2, v) do {} while(0)
+#define plot(name1, name2, v) Serial.printf(">%s %s:%i\r\n", name1, name2, (int)(v))
+
 const byte STMPE_CS = 32;
 const byte TFT_CS = 15;
 const byte TFT_DC = 33;
