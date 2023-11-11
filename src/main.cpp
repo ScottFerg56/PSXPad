@@ -10,6 +10,9 @@
 #include "VirtualMotor.h"
 #include "Flogger.h"
 
+#define plot(name1, name2, v) do {} while(0)
+//#define plot(name1, name2, v) Serial.printf(">%s %s:%i\r\n", name1, name2, (int)(v))
+
 // E8:9F:6D:22:02:EC
 
 uint8_t broadcastAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
@@ -54,14 +57,13 @@ float valKnob3;
 int flog_printer(const char* s)
 {
     Serial.print(s);
+    // 12x16 characters
+    int16_t y = tft.getCursorY();
+    if (y >= tft.height())
+        tft.setCursor(0, 0);
+    // clear this line and the next for clarity
+    tft.fillRect(0, 0, tft.width(), 2*16, HX8357_BLUE);
     return tft.print(s);
-}
-
-void err(const char *msg)
-{
-    flogd("%s", msg);
-    while (1)
-        ;
 }
 
 void TFTpreMsg()
@@ -85,14 +87,14 @@ void TFTpreMsg()
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
     if (status != ESP_NOW_SEND_SUCCESS)
-        flogd("Delivery Fail");
+        flogw("Delivery Fail");
 }
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *pData, int len)
 {
     if (len == 0 || (len & 1) != 0)
     {
-        flogd("invalid data packet length");
+        floge("invalid data packet length");
         return;
     }
     while (len > 0)
@@ -126,26 +128,22 @@ extern void DBAnalog(PadKeys btn, Point p);
 
 bool PSXinit()
 {
-    if (psx.begin())
+    if (!psx.begin())
     {
-        flogd("Controller found!");
-        delay(300);
-        if (!psx.enterConfigMode())
-        {
-            flogd("Cannot enter config mode");
-            return true;
-        }
-        if (!psx.enableAnalogSticks())
-            flogd("Cannot enable analog sticks");
-
-        if (!psx.enableAnalogButtons())
-            flogd("Cannot enable analog buttons");
-
-        if (!psx.exitConfigMode())
-            flogd("Cannot exit config mode");
-        return true;
+        floge("Controller not found");
+        return false;
     }
-    return false;
+    flogi("Controller found");
+    delay(300);
+    if (!psx.enterConfigMode())
+        floge("Cannot enter config mode");
+    if (!psx.enableAnalogSticks())
+        floge("Cannot enable analog sticks");
+    if (!psx.enableAnalogButtons())
+        floge("Cannot enable analog buttons");
+    if (!psx.exitConfigMode())
+        floge("Cannot exit config mode");
+    return true;
 }
 
 bool haveController = false;
@@ -199,7 +197,7 @@ void processKnob(ScaledKnob& knob, int id, float& value)
             packet[1] = (int8_t)value;
             esp_err_t result = esp_now_send(broadcastAddress, (uint8_t*)&packet, 2);
             if (result != ESP_OK)
-                flogd("Error sending the data");
+                floge("Error sending the data");
             Motors[id].Goal = (int8_t)value;
         }
     }
@@ -207,7 +205,8 @@ void processKnob(ScaledKnob& knob, int id, float& value)
 
 void setup(void)
 {
-    FLogger::SetPrinter(&flog_printer);
+    FLogger::setPrinter(&flog_printer);
+    FLogger::setLogLevel(FLOG_DEBUG);
     led.config(OUTPUT, HIGH);
     Serial.begin(115200);
     delay(2000);
@@ -220,26 +219,26 @@ void setup(void)
     tft.setRotation(1);
     tft.fillScreen(HX8357_BLACK);
     tft.setTextSize(2);
-    flogd("TFT init");
+    flogi("TFT init");
 
-    flogd("Touchscreen init");
+    flogi("Touchscreen init");
     if (!ts.begin())
-        err("FAILED");
+        flogf("%s FAILED", "Touchscreen init");
 
     haveController = PSXinit();
 
     // ESP32 requires 25 MHz limit
-    flogd("SD init");
+    flogi("SD init");
     if (!SD.begin(SD_CS, SD_SCK_MHZ(25)))
-        err("FAILED");
+        flogf("%s FAILED", "SD init");
 
-    flogd("WIFI init");
+    flogi("WIFI init");
     if (!WiFi.mode(WIFI_STA))
-        err("FAILED");
+        flogf("%s FAILED", "WIFI init");
 
-    flogd("ESP_NOW init");
+    flogi("ESP_NOW init");
     if (esp_now_init() != ESP_OK)
-        err("FAILED");
+        flogf("%s FAILED", "ESP_NOW init");
 
     esp_now_register_send_cb(OnDataSent);
 
@@ -247,12 +246,12 @@ void setup(void)
     peerInfo.channel = 0;  
     peerInfo.encrypt = false;
     if (esp_now_add_peer(&peerInfo) != ESP_OK)
-        err("Failed to add peer");
+        flogf("%s FAILED", "ESP_NOW peer add");
     
     esp_now_register_recv_cb(OnDataRecv);
-    flogd("SeeSaw init");
+    flogi("SeeSaw init");
     if (!SeeSaw.begin(0x49) || !SSPixel.begin(0x49))
-        err("FAILED");
+        flogf("%s FAILED", "SeeSaw init");
 
     SSPixel.setBrightness(50);
 
@@ -267,8 +266,7 @@ void setup(void)
     Knob3.SetColor(128,   0, 128);
 
     //ESP_LOGD("main", "setup completed");
-    flogd("completed");
-    flogd("OK");
+    flogi("completed");
     delay(2000);
     tft.fillScreen(HX8357_BLUE);
     tft.setCursor(0, 280);
@@ -311,7 +309,7 @@ void loop()
         }
         if (!psx.read())
         {
-            flogd("Controller lost");
+            floge("Controller lost");
             haveController = false;
         }
         else
@@ -330,7 +328,7 @@ void loop()
                         DBButtonPress(i, pressed);
                         if (i == PadKeys_start && pressed)
                         {
-                            flogd("MAC addr: %s", WiFi.macAddress());
+                            flogi("MAC addr: %s", WiFi.macAddress());
                         }
                     }
                     msk <<= 1;
