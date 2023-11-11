@@ -60,9 +60,12 @@ int flog_printer(const char* s)
     // 12x16 characters
     int16_t y = tft.getCursorY();
     if (y >= tft.height())
+    {
         tft.setCursor(0, 0);
+        y = 0;
+    }
     // clear this line and the next for clarity
-    tft.fillRect(0, 0, tft.width(), 2*16, HX8357_BLUE);
+    tft.fillRect(0, y, tft.width(), 2*16, HX8357_BLUE);
     return tft.print(s);
 }
 
