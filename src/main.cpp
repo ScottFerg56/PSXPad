@@ -2,10 +2,10 @@
 #include <Adafruit_SPIFlash.h>    // SPI / QSPI flash library
 #include <DigitalPin.h>
 #include <Wire.h>
-#include "ScaledKnob.h"
+#include "Flogger.h"
 #include "PSXPad.h"
 #include "VirtualBot.h"
-#include "Flogger.h"
+#include "Pad.h"
 
 // E8:9F:6D:22:02:EC
 
@@ -28,8 +28,7 @@ Adafruit_GFX_Button menu[4];
 int menuItem = Menu_TBD;
 
 extern void DBinit();
-extern void DBButtonPress(PadKeys btn, int8_t v);
-extern void DBAnalog(PadKeys btn, Point p);
+extern void DBEcho(PadKeys btn, int16_t x, int16_t y);
 
 void selectMenuItem(int newItem)
 {
@@ -66,29 +65,6 @@ void selectNextMenuItem()
     selectMenuItem(newItem);
 }
 
-int8_t analogBtnMap[] =
-{
-    -1,             // PadKeys_select,
-    -1,             // PadKeys_l3,
-    -1,             // PadKeys_r3,
-    -1,             // PadKeys_start,
-    PSAB_PAD_UP,    // PadKeys_up,
-    PSAB_PAD_RIGHT, // PadKeys_right,
-    PSAB_PAD_DOWN,  // PadKeys_down,
-    PSAB_PAD_LEFT,  // PadKeys_left,
-    PSAB_L2,        // PadKeys_l2,
-    PSAB_R2,        // PadKeys_r2,
-    PSAB_L1,        // PadKeys_l1,
-    PSAB_R1,        // PadKeys_r1,
-    PSAB_TRIANGLE,  // PadKeys_triangle,
-    PSAB_CIRCLE,    // PadKeys_circle,
-    PSAB_CROSS,     // PadKeys_cross,
-    PSAB_SQUARE,    // PadKeys_square,
-    -1,             // PadKeys_analog,
-    -1,             // PadKeys_leftStick,
-    -1,             // PadKeys_rightStick,
-};
-
 DigitalPin<LED_BUILTIN> led;
 
 SdFat SD;
@@ -98,23 +74,8 @@ Adafruit_ImageReader reader(SD);
 Adafruit_HX8357 tft = Adafruit_HX8357(TFT_CS, TFT_DC);
 Adafruit_STMPE610 ts = Adafruit_STMPE610(STMPE_CS);
 
-PsxControllerBitBang<PSX_ATT, PSX_CMD, PSX_DAT, PSX_CLK> psx;
-
 int16_t calib[4] = {154, 3812, 276, 3808};
 TS_Point lastTSpt;
-
-Adafruit_seesaw SeeSaw;
-seesaw_NeoPixel SSPixel = seesaw_NeoPixel(4, 18, NEO_GRB + NEO_KHZ800);
-
-ScaledKnob Knob0(0, 12, -100, 100, 5);
-ScaledKnob Knob1(1, 14, -100, 100, 5);
-ScaledKnob Knob2(2, 17, -100, 100, 5);
-ScaledKnob Knob3(3,  9, -100, 100, 5);
-
-float valKnob0;
-float valKnob1;
-float valKnob2;
-float valKnob3;
 
 int flog_printer(const char* s)
 {
@@ -149,99 +110,6 @@ void TFTpreMsg()
     }
 }
 
-void enableAnalog()
-{
-    if (!psx.enterConfigMode())
-        floge("Cannot enter config mode");
-    if (!psx.enableAnalogSticks(true, true))
-        floge("Cannot enable analog sticks");
-    if (!psx.enableAnalogButtons())
-        floge("Cannot enable analog buttons");
-    if (!psx.exitConfigMode())
-        floge("Cannot exit config mode");
-}
-
-bool PSXinit()
-{
-    if (!psx.begin())
-    {
-        floge("Controller not found");
-        return false;
-    }
-    flogi("Controller found");
-    delay(300);
-    enableAnalog();
-    return true;
-}
-
-bool haveController = false;
-Point currBtns[PadKeys_rightStick-PadKeys_select+1];
-
-const int16_t deadzone = 27;
-
-bool ProcessStickXY(Point &p, byte x, byte y)
-{
-    // convert [0..255]
-    // convert to [-127..127]
-    int16_t xx = (int16_t)x - 128;
-    if (xx == -128)
-        xx = -127;
-    int16_t yy = (int16_t)y - 128;      
-    if (yy == -128)
-        yy = -127;
-    // flip the Y axes so that positive is up
-    yy = -yy;
-    // enforce a stick deadzone (27)
-    // subtracting it out, leaving values [-100..100]
-    if (abs(xx) <= deadzone)
-        xx = 0;
-    else if (xx > 0)
-        xx -= deadzone;
-    else
-        xx += deadzone;
-    if (abs(yy) <= deadzone)
-        yy = 0;
-    else if (yy > 0)
-        yy -= deadzone;
-    else
-        yy += deadzone;
-    if (xx == p.x && yy == p.y)
-        return false;
-    p.x = xx;
-    p.y = yy;
-    return true;
-}
-
-bool ProcessBtn(Point &p, byte x)
-{
-    if (x == p.x)
-        return false;
-    p.x = x;
-    return true;
-}
-
-void processKnob(ScaledKnob& knob, int id, float& value)
-{
-    float v = 0;
-    if (knob.Pressed() == ScaledKnob::Presses::Press)
-    {
-        knob.SetValue(0);
-    }
-    else
-    {
-        knob.Sample();
-        v = knob.GetValue();
-    }
-    if (v != value)
-    {
-        value = v;
-        if (id < 3)
-        {
-            VirtualBot::setEntityProperty(Entities_LeftMotor + id, MotorProperties_Goal, (int8_t)value);
-        }
-    }
-}
-
 void setup(void)
 {
     FLogger::setPrinter(&flog_printer);
@@ -265,30 +133,13 @@ void setup(void)
     if (!SD.begin(SD_CS, SD_SCK_MHZ(25)))
         flogf("%s FAILED", "SD init");
 
-    flogi("SeeSaw init");
-    if (!SeeSaw.begin(0x49) || !SSPixel.begin(0x49))
-        flogf("%s FAILED", "SeeSaw init");
-
     VirtualBot::init(botMacAddress);
 
-    SSPixel.setBrightness(50);
+    Pad::init();
 
-    Knob0.Init(&SeeSaw, &SSPixel, 0);
-    Knob1.Init(&SeeSaw, &SSPixel, 0);
-    Knob2.Init(&SeeSaw, &SSPixel, 0);
-    Knob3.Init(&SeeSaw, &SSPixel, 0);
-
-    Knob0.SetColor(128,   0,   0);
-    Knob1.SetColor(  0, 128,   0);
-    Knob2.SetColor(  0,   0, 128);
-    Knob3.SetColor(128,   0, 128);
-
-    //ESP_LOGD("main", "setup completed");
     flogi("completed");
 
-    haveController = PSXinit();
-
-    delay(2000);
+    delay(1000);
 
     for (int i = Menu_Telemetry; i <= Menu_TBD; i++)
     {
@@ -309,6 +160,37 @@ void setup(void)
 
 unsigned long timeInputLast = 0;
 unsigned long timePlotLast = 0;
+
+void padCallback(PadKeys btn, int16_t x, int16_t y)
+{
+    DBEcho(btn, x, y);
+    switch (btn)
+    {
+    case PadKeys_select:
+        if (x != 0)
+            selectNextMenuItem();
+        break;
+    case PadKeys_knob0Btn:
+    case PadKeys_knob1Btn:
+    case PadKeys_knob2Btn:
+    case PadKeys_knob3Btn:
+        if (x != 0)
+            Pad::setKnobValue((PadKeys)(btn+4), 0);
+        break;
+    case PadKeys_knob0:
+    case PadKeys_knob1:
+    case PadKeys_knob2:
+        {
+            Entities entity = (Entities)(Entities_LeftMotor + (btn - PadKeys_knob0));
+            VirtualBot::setEntityProperty(entity, MotorProperties_Goal, (int8_t)x);
+        }
+        break;    
+    case PadKeys_knob3:
+        break;
+    default:
+        break;
+    }
+}
 
 void loop()
 {
@@ -348,61 +230,7 @@ void loop()
                 }
             }
         }
-        if (!haveController)
-        {
-            haveController = PSXinit();
-            if (!haveController)
-                return;
-        }
-        if (!psx.read())
-        {
-            floge("Controller lost");
-            haveController = false;
-        }
-        else if (!psx.getAnalogButtonDataValid() || !psx.getAnalogSticksValid())
-        {
-            //flogi("anlog mode reenabled");
-            enableAnalog();
-        }
-        else
-        {
-            byte x, y;
-            psx.getLeftAnalog(x, y);
-            if (ProcessStickXY(currBtns[PadKeys_leftStick], x, y))
-                DBAnalog(PadKeys_leftStick, currBtns[PadKeys_leftStick]);
-            psx.getRightAnalog(x, y);
-            if (ProcessStickXY(currBtns[PadKeys_rightStick], x, y))
-                DBAnalog(PadKeys_rightStick, currBtns[PadKeys_rightStick]);
-
-            PsxButtons btns = psx.getButtonWord();
-
-            PsxButtons msk = 1;
-            for (PadKeys i = PadKeys_select; i <= PadKeys_square; ++i)
-            {
-                byte v = 0;
-                int8_t abtn = analogBtnMap[i];
-                if (abtn != -1)
-                {
-                    v = psx.getAnalogButton((PsxAnalogButton)abtn);
-                }
-                else
-                {
-                    v = (btns & msk) != 0 ? 0xff : 0;
-                }
-                if (ProcessBtn(currBtns[i], v))
-                {
-                    DBButtonPress(i, v);
-                    if (i == PadKeys_select && v != 0)
-                        selectNextMenuItem();
-                }
-                msk <<= 1;
-            }
-        }
-        processKnob(Knob0, 0, valKnob0);
-        processKnob(Knob1, 1, valKnob1);
-        processKnob(Knob2, 2, valKnob2);
-        processKnob(Knob3, 3, valKnob3);
-
+        Pad::loop(&padCallback);
         VirtualBot::flush();
     }
     dmsec = msec - timePlotLast;

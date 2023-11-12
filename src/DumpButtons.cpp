@@ -10,14 +10,6 @@ uint16_t msgHeight = 2 * charHeight;
 uint16_t msgX = (tftWidth - msgWidth) / 2;
 uint16_t msgY = menuY - msgHeight;
 
-void msgPrep()
-{
-    tft.setCursor(msgX, msgY);
-    tft.setTextSize(2);
-    tft.setTextColor(HX8357_WHITE);
-    tft.fillRect(msgX, msgY, msgWidth, msgHeight, HX8357_BLUE);
-}
-
 const char *const psxButtonNames[] =
 {
     "Select",
@@ -114,27 +106,50 @@ Adafruit_Image imgPSXPad;
 
 void drawButton(PadKeys btn, bool red)
 {
+    if (btn >= PadKeys_knob0Btn)
+        return;
     Point pt = KeyImageMap[(int)btn];
     Adafruit_Image& img = GetKeyImage(btn, red);
     if (img.getFormat() != IMAGE_NONE)
         img.draw(tft, pt.x + padX, pt.y + padY);
 }
 
-void DBButtonPress(PadKeys btn, int8_t v)
+void DBEcho(PadKeys btn, int16_t x, int16_t y)
 {
-    drawButton(btn, v != 0);
-    msgPrep();
-    if (v != 0)
-        tft.printf("    %4u    ", (uint8_t)v);
-}
-
-void DBAnalog(PadKeys btn, Point p)
-{
-    bool zeroed = p.x == 0 && p.y == 0;
+    bool zeroed = x == 0 && y == 0;
     drawButton(btn, !zeroed);
-    msgPrep();
+    switch (btn)
+    {
+    case PadKeys_knob0:
+    case PadKeys_knob1:
+    case PadKeys_knob2:
+    case PadKeys_knob3:
+        {
+            int16_t x = (btn - PadKeys_knob0) * menuItemWidth;
+            tft.fillRect(x, 1, menuItemWidth, charHeight, HX8357_BLUE);
+            tft.setCursor(x, 1);
+        }
+        break;
+    default:
+        tft.fillRect(msgX, msgY, msgWidth, msgHeight, HX8357_BLUE);
+        tft.setCursor(msgX, msgY);
+        break;
+    }
+    tft.setTextSize(2);
+    tft.setTextColor(HX8357_WHITE);
     if (!zeroed)
-        tft.printf("%4i    %4i", p.x, p.y);
+    {
+        switch (btn)
+        {
+        case PadKeys_leftStick:
+        case PadKeys_rightStick:
+            tft.printf("%4i    %4i", x, y);
+            break;
+        default:
+            tft.printf("    %4i    ", x);
+            break;
+        }
+    }
 }
 
 void DBinit()
