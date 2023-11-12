@@ -11,6 +11,84 @@
 
 uint8_t botMacAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
 
+uint16_t RGBto565(uint8_t r, uint8_t g, uint8_t b)
+{
+    return ((r / 8) << 11) | ((g / 4) << 5) | (b / 8);
+}
+
+enum MenuItems
+{
+    Menu_Telemetry,
+    Menu_Echo,
+    Menu_Log,
+    Menu_TBD
+};
+
+Adafruit_GFX_Button menu[4];
+int menuItem = Menu_TBD;
+
+extern void DBinit();
+extern void DBButtonPress(PadKeys btn, int8_t v);
+extern void DBAnalog(PadKeys btn, Point p);
+
+void selectMenuItem(int newItem)
+{
+    if (newItem != menuItem)
+    {
+        menu[menuItem].drawButton(false);
+        menuItem = newItem;
+        menu[menuItem].drawButton(true);
+        tft.setTextColor(HX8357_WHITE);
+        switch (menuItem)
+        {
+        case Menu_Echo:
+            tft.setCursor(0,0);
+            DBinit();
+            break;
+        case Menu_Telemetry:
+        case Menu_Log:
+        case Menu_TBD:
+            tft.fillRect(0, 0, tftWidth, menuY, HX8357_BLACK);
+            tft.setCursor(0,0);
+            break;
+        
+        default:
+            break;
+        }
+    }
+}
+
+void selectNextMenuItem()
+{
+    int newItem = menuItem + 1;
+    if (newItem > Menu_TBD)
+        newItem = Menu_Telemetry;
+    selectMenuItem(newItem);
+}
+
+int8_t analogBtnMap[] =
+{
+    -1,             // PadKeys_select,
+    -1,             // PadKeys_l3,
+    -1,             // PadKeys_r3,
+    -1,             // PadKeys_start,
+    PSAB_PAD_UP,    // PadKeys_up,
+    PSAB_PAD_RIGHT, // PadKeys_right,
+    PSAB_PAD_DOWN,  // PadKeys_down,
+    PSAB_PAD_LEFT,  // PadKeys_left,
+    PSAB_L2,        // PadKeys_l2,
+    PSAB_R2,        // PadKeys_r2,
+    PSAB_L1,        // PadKeys_l1,
+    PSAB_R1,        // PadKeys_r1,
+    PSAB_TRIANGLE,  // PadKeys_triangle,
+    PSAB_CIRCLE,    // PadKeys_circle,
+    PSAB_CROSS,     // PadKeys_cross,
+    PSAB_SQUARE,    // PadKeys_square,
+    -1,             // PadKeys_analog,
+    -1,             // PadKeys_leftStick,
+    -1,             // PadKeys_rightStick,
+};
+
 DigitalPin<LED_BUILTIN> led;
 
 SdFat SD;
@@ -71,9 +149,17 @@ void TFTpreMsg()
     }
 }
 
-extern void DBinit();
-extern void DBButtonPress(PadKeys btn, bool pressed);
-extern void DBAnalog(PadKeys btn, Point p);
+void enableAnalog()
+{
+    if (!psx.enterConfigMode())
+        floge("Cannot enter config mode");
+    if (!psx.enableAnalogSticks(true, true))
+        floge("Cannot enable analog sticks");
+    if (!psx.enableAnalogButtons())
+        floge("Cannot enable analog buttons");
+    if (!psx.exitConfigMode())
+        floge("Cannot exit config mode");
+}
 
 bool PSXinit()
 {
@@ -84,26 +170,19 @@ bool PSXinit()
     }
     flogi("Controller found");
     delay(300);
-    if (!psx.enterConfigMode())
-        floge("Cannot enter config mode");
-    if (!psx.enableAnalogSticks())
-        floge("Cannot enable analog sticks");
-    if (!psx.enableAnalogButtons())
-        floge("Cannot enable analog buttons");
-    if (!psx.exitConfigMode())
-        floge("Cannot exit config mode");
+    enableAnalog();
     return true;
 }
 
 bool haveController = false;
-Point lastLeftStick;
-Point lastRightStick;
-uint16_t lastBtns;
+Point currBtns[PadKeys_rightStick-PadKeys_select+1];
+
+const int16_t deadzone = 27;
 
 bool ProcessStickXY(Point &p, byte x, byte y)
 {
-    // UNDONE: map values around the missing deadzone?
-    // convert [0..255] to [-127..127] (byte to signed byte)
+    // convert [0..255]
+    // convert to [-127..127]
     int16_t xx = (int16_t)x - 128;
     if (xx == -128)
         xx = -127;
@@ -112,15 +191,32 @@ bool ProcessStickXY(Point &p, byte x, byte y)
         yy = -127;
     // flip the Y axes so that positive is up
     yy = -yy;
-    // enforce a stick deadzone
+    // enforce a stick deadzone (27)
+    // subtracting it out, leaving values [-100..100]
     if (abs(xx) <= deadzone)
         xx = 0;
+    else if (xx > 0)
+        xx -= deadzone;
+    else
+        xx += deadzone;
     if (abs(yy) <= deadzone)
         yy = 0;
+    else if (yy > 0)
+        yy -= deadzone;
+    else
+        yy += deadzone;
     if (xx == p.x && yy == p.y)
         return false;
     p.x = xx;
     p.y = yy;
+    return true;
+}
+
+bool ProcessBtn(Point &p, byte x)
+{
+    if (x == p.x)
+        return false;
+    p.x = x;
     return true;
 }
 
@@ -164,8 +260,6 @@ void setup(void)
     if (!ts.begin())
         flogf("%s FAILED", "Touchscreen init");
 
-    haveController = PSXinit();
-
     // ESP32 requires 25 MHz limit
     flogi("SD init");
     if (!SD.begin(SD_CS, SD_SCK_MHZ(25)))
@@ -191,10 +285,26 @@ void setup(void)
 
     //ESP_LOGD("main", "setup completed");
     flogi("completed");
+
+    haveController = PSXinit();
+
     delay(2000);
-    tft.fillScreen(HX8357_BLUE);
-    tft.setCursor(0, 280);
-    DBinit();
+
+    for (int i = Menu_Telemetry; i <= Menu_TBD; i++)
+    {
+        int16_t x = i * menuItemWidth;
+        const char* label;
+        switch (i)
+        {
+        case Menu_Telemetry: label = "TELEM"; break;
+        case Menu_Echo:      label = "ECHO";  break;
+        case Menu_Log:       label = "LOG";   break;
+        case Menu_TBD:       label = "TBD";   break;
+        }
+        menu[i].initButtonUL(&tft, x, menuY, menuItemWidth, menuItemHeight, HX8357_WHITE, RGBto565(0x50,0x50,0x50), RGBto565(0xB0,0xB0,0xB0), (char*)label, 2);
+        menu[i].drawButton();
+    }
+    selectMenuItem(Menu_Echo);
 }
 
 unsigned long timeInputLast = 0;
@@ -223,6 +333,19 @@ void loop()
                 y = tft.height() - y;
                 tft.fillCircle(x, y, 3, HX8357_MAGENTA);
                 //Serial.print("("); Serial.print(p.x); Serial.print(","); Serial.print(p.y); Serial.println(")");
+                int newItem = -1;
+                for (int i = Menu_Telemetry; i <= Menu_TBD; i++)
+                {
+                    if (menu[i].contains(x, y))
+                    {
+                        newItem = i;
+                        break;
+                    }
+                }
+                if (newItem != -1)
+                {
+                    selectMenuItem(newItem);
+                }
             }
         }
         if (!haveController)
@@ -236,33 +359,44 @@ void loop()
             floge("Controller lost");
             haveController = false;
         }
+        else if (!psx.getAnalogButtonDataValid() || !psx.getAnalogSticksValid())
+        {
+            //flogi("anlog mode reenabled");
+            enableAnalog();
+        }
         else
         {
-            PsxButtons btns = psx.getButtonWord();
-
-            PsxButtons chg = btns ^ lastBtns;
-            if (chg != 0)
-            {
-                PsxButtons msk = 1;
-                for (PadKeys i = PadKeys_select; i <= PadKeys_square; ++i)
-                {
-                    if (chg & msk)
-                    {
-                        bool pressed = (btns & msk) != 0;
-                        DBButtonPress(i, pressed);
-                    }
-                    msk <<= 1;
-                }
-            }
-            lastBtns = btns;
-
             byte x, y;
             psx.getLeftAnalog(x, y);
-            if (ProcessStickXY(lastLeftStick, x, y))
-                DBAnalog(PadKeys_leftStick, lastLeftStick);
+            if (ProcessStickXY(currBtns[PadKeys_leftStick], x, y))
+                DBAnalog(PadKeys_leftStick, currBtns[PadKeys_leftStick]);
             psx.getRightAnalog(x, y);
-            if (ProcessStickXY(lastRightStick, x, y))
-                DBAnalog(PadKeys_rightStick, lastRightStick);
+            if (ProcessStickXY(currBtns[PadKeys_rightStick], x, y))
+                DBAnalog(PadKeys_rightStick, currBtns[PadKeys_rightStick]);
+
+            PsxButtons btns = psx.getButtonWord();
+
+            PsxButtons msk = 1;
+            for (PadKeys i = PadKeys_select; i <= PadKeys_square; ++i)
+            {
+                byte v = 0;
+                int8_t abtn = analogBtnMap[i];
+                if (abtn != -1)
+                {
+                    v = psx.getAnalogButton((PsxAnalogButton)abtn);
+                }
+                else
+                {
+                    v = (btns & msk) != 0 ? 0xff : 0;
+                }
+                if (ProcessBtn(currBtns[i], v))
+                {
+                    DBButtonPress(i, v);
+                    if (i == PadKeys_select && v != 0)
+                        selectNextMenuItem();
+                }
+                msk <<= 1;
+            }
         }
         processKnob(Knob0, 0, valKnob0);
         processKnob(Knob1, 1, valKnob1);

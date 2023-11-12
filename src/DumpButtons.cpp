@@ -1,6 +1,22 @@
 #include <arduino.h>
 #include <DigitalPin.h>
 #include "PSXPad.h"
+#include "FLogger.h"
+
+int16_t padX = 0;
+int16_t padY = 0;
+uint16_t msgWidth = 13 * charWidth;
+uint16_t msgHeight = 2 * charHeight;
+uint16_t msgX = (tftWidth - msgWidth) / 2;
+uint16_t msgY = menuY - msgHeight;
+
+void msgPrep()
+{
+    tft.setCursor(msgX, msgY);
+    tft.setTextSize(2);
+    tft.setTextColor(HX8357_WHITE);
+    tft.fillRect(msgX, msgY, msgWidth, msgHeight, HX8357_BLUE);
+}
 
 const char *const psxButtonNames[] =
 {
@@ -88,49 +104,52 @@ Adafruit_Image& GetKeyImage(PadKeys btn, bool red)
 			strcat(name, "r");
 		strcat(name, ".bmp");
 		ImageReturnCode stat = reader.loadBMP(name, img);
-#if false
-		if (stat == IMAGE_SUCCESS)
-		{
-			Serial.print(name);
-			Serial.println(F(" BMP load succeeded"));
-		}
-		else
-		{
-			Serial.print(name);
-			Serial.print(F(" BMP load failed: "));
-			reader.printStatus(stat);
-			Serial.println();
-		}
-#endif
+        if (stat != IMAGE_SUCCESS)
+            floge("image load failed: %i", stat);
 	}
 	return img;
 }
  
 Adafruit_Image imgPSXPad;
 
-void DBButtonPress(PadKeys btn, bool pressed)
+void drawButton(PadKeys btn, bool red)
 {
     Point pt = KeyImageMap[(int)btn];
-    Adafruit_Image& img = GetKeyImage(btn, pressed);
+    Adafruit_Image& img = GetKeyImage(btn, red);
     if (img.getFormat() != IMAGE_NONE)
-        img.draw(tft, pt.x, pt.y);
+        img.draw(tft, pt.x + padX, pt.y + padY);
+}
+
+void DBButtonPress(PadKeys btn, int8_t v)
+{
+    drawButton(btn, v != 0);
+    msgPrep();
+    if (v != 0)
+        tft.printf("    %4u    ", (uint8_t)v);
 }
 
 void DBAnalog(PadKeys btn, Point p)
 {
-    tft.setCursor(0, 280);
-    tft.setTextSize(2);
-    tft.fillRect(0, 280, 24 * 12, 280+16, HX8357_BLUE);
-    TFTpreMsg();
-    tft.printf("%10s x:%4i y:%4i\r\n", psxButtonNames[(int)btn], p.x, p.y);
-    DBButtonPress(btn, p.x != 0 || p.y != 0);
+    bool zeroed = p.x == 0 && p.y == 0;
+    drawButton(btn, !zeroed);
+    msgPrep();
+    if (!zeroed)
+        tft.printf("%4i    %4i", p.x, p.y);
 }
 
 void DBinit()
 {
+    tft.fillRect(0, 0, tftWidth, menuY, HX8357_BLUE);
 	if (imgPSXPad.getFormat() == IMAGE_NONE)
 	{
-		if (reader.loadBMP("/psxpad.bmp", imgPSXPad) == IMAGE_SUCCESS)
-    		imgPSXPad.draw(tft, 0, 0);
+		ImageReturnCode stat = reader.loadBMP("/psxpad.bmp", imgPSXPad);
+        if (stat != IMAGE_SUCCESS)
+        {
+            floge("image load failed: %i", stat);
+            return;
+        }
 	}
+    padX = (tftWidth - imgPSXPad.width()) / 2;
+    padY = menuY - imgPSXPad.height();
+    imgPSXPad.draw(tft, padX, padY);
 }

@@ -1145,6 +1145,14 @@ public:
 		return ret;
 	}
 
+	bool getAnalogButtonDataValid() const {
+		return analogButtonDataValid;
+	}
+
+	boolean getAnalogSticksValid () const {
+		return analogSticksValid;
+	}
+
 	/** \brief Retrieve all analog button data
 	 */
 	const byte* getAnalogButtonData () const {

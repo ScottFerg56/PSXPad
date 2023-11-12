@@ -7,8 +7,8 @@
 #include <Adafruit_ImageReader.h> // Image-reading functions
 #include <PsxControllerBitBang.h>
 
-//#define plot(name1, name2, v) do {} while(0)
-#define plot(name1, name2, v) Serial.printf(">%s %s:%i\r\n", name1, name2, (int)(v))
+#define plot(name1, name2, v) do {} while(0)
+//#define plot(name1, name2, v) Serial.printf(">%s %s:%i\r\n", name1, name2, (int)(v))
 
 const byte STMPE_CS = 32;
 const byte TFT_CS = 15;
@@ -25,13 +25,21 @@ extern Adafruit_HX8357 tft;
 extern Adafruit_STMPE610 ts;
 extern PsxControllerBitBang<PSX_ATT, PSX_CMD, PSX_DAT, PSX_CLK> psx;
 
+const int16_t tftWidth = 480;
+const int16_t tftHeight = 320;
+const uint8_t charWidth = 12;
+const uint8_t charHeight = 16;
+
+const int8_t menuItems = 4;
+const uint16_t menuItemWidth = tftWidth / menuItems;
+const uint16_t menuItemHeight = charHeight + 12;
+const int16_t menuY = tftHeight - menuItemHeight;
+
 struct Point
 {
     int16_t x;
     int16_t y;
 };
-
-const int16_t deadzone = 20;
 
 void TFTpreMsg();
 
