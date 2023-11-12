@@ -163,7 +163,8 @@ unsigned long timePlotLast = 0;
 
 void padCallback(PadKeys btn, int16_t x, int16_t y)
 {
-    DBEcho(btn, x, y);
+    if (menuItem == Menu_Echo)
+        DBEcho(btn, x, y);
     switch (btn)
     {
     case PadKeys_select:

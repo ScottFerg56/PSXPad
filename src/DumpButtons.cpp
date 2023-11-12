@@ -38,25 +38,25 @@ Adafruit_Image KeyImagesRed[19];
 
 Point KeyImageMap[] =
 {
-	{123,141},	// select,
-	{ 89,171},	// l3,
-	{184,171},	// r3,
-	{180,140},	// start,
-	{ 55,119},	// up,
-	{ 70,136},	// right,
-	{ 55,151},	// down,
-	{ 38,136},	// left,
+	{123,125},	// select,
+	{ 89,155},	// l3,
+	{184,155},	// r3,
+	{180,124},	// start,
+	{ 55,103},	// up,
+	{ 70,120},	// right,
+	{ 55,135},	// down,
+	{ 38,120},	// left,
 	{ 47,  0},	// l2,
 	{235,  0},	// r2,
-	{ 47, 51},	// l1,
-	{235, 51},	// r1,
-	{243,109},	// triangle
-	{270,134},	// circle,
-	{243,159},	// cross,
-	{216,134},	// square,
-	{152,170},	// analog,
-	{ 89,171},	// leftStick,
-	{184,171},	// rightStick,
+	{ 47, 38},	// l1,
+	{235, 38},	// r1,
+	{243, 93},	// triangle
+	{270,118},	// circle,
+	{243,143},	// cross,
+	{216,118},	// square,
+	{152,154},	// analog,
+	{ 89,155},	// leftStick,
+	{184,155},	// rightStick,
 };
 
 PadKeys ImageShareMap[] =
@@ -165,6 +165,6 @@ void DBinit()
         }
 	}
     padX = (tftWidth - imgPSXPad.width()) / 2;
-    padY = menuY - imgPSXPad.height();
+    padY = menuY - imgPSXPad.height() - 4;
     imgPSXPad.draw(tft, padX, padY);
 }
