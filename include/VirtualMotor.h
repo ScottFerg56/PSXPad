@@ -1,5 +1,5 @@
-#ifndef VirtualMotor_h
-#define VirtualMotor_h
+#ifndef _VIRTUALMOTOR_H
+#define _VIRTUALMOTOR_H
 
 #include "\Projects\Rovio\RovioMotor\include\Packet.h"
 
@@ -25,4 +25,4 @@ public:
     bool getPropertyChanged(int8_t property);
 };
 
-#endif
+#endif // _VIRTUALMOTOR_H

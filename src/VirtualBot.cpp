@@ -3,10 +3,18 @@
 #include <esp_now.h>
 #include <WiFi.h>
 #include "PSXPad.h"
+#include "Pad.h"
 
 namespace VirtualBot
 {
 VirtualMotor Motors[3];
+Point EntityScreenMap[] =
+{
+	{ 144,  32},  // left motor
+    { 288,  32},  // right motor
+    { 216, 120},  // rear motor
+    { 216,  32},  // all motors (labels)
+};
 
 esp_now_peer_info_t peerInfo;
 
@@ -78,6 +86,7 @@ const char* getEntityPropertyName(int8_t entity, int8_t property)
     case Entities_LeftMotor:
     case Entities_RightMotor:
     case Entities_RearMotor:
+    case Entities_AllMotors:
         switch (property)
         {
         case MotorProperties_Goal:
@@ -85,7 +94,7 @@ const char* getEntityPropertyName(int8_t entity, int8_t property)
         case MotorProperties_RPM:
             return "RPM";
         case MotorProperties_DirectDrive:
-            return "DirectDrive";
+            return "DD";
         default:
             return "***";
         }
@@ -149,6 +158,130 @@ bool getEntityPropertyChanged(int8_t entity, int8_t property)
     }
 }
 
+bool active = true;
+bool enabled = true;
+
+const int8_t telMargin = 3;
+const int8_t telSpacing = 5;
+void drawTelemetry(int8_t entity, int8_t prop, int8_t value)
+{
+    int16_t x = EntityScreenMap[entity].x;
+    int16_t y = EntityScreenMap[entity].y;
+
+    switch (prop)
+    {
+    case MotorProperties_Goal:
+        break;
+    case MotorProperties_RPM:
+        y += charHeight + telMargin * 2 + telSpacing;
+        break;
+    case MotorProperties_DirectDrive:
+        y += 2 * (charHeight + telMargin * 2 + telSpacing);
+        break;
+    }
+    // no descenders in our text, so a slight Y offset to better center vertically
+    tft.setCursor(x, y+1);
+    tft.fillRect(x-telMargin, y-telMargin, 4 * charWidth + telMargin*2, charHeight + telMargin*2, HX8357_BLACK);
+    if (entity == Entities_AllMotors)
+    {
+        tft.print(getEntityPropertyName(entity, prop));
+    }
+    else
+    {
+        switch (prop)
+        {
+        case MotorProperties_Goal:
+        case MotorProperties_RPM:
+            tft.printf("%4i", value);
+            break;
+        case MotorProperties_DirectDrive:
+            if (value != 0)
+                tft.print(" DD ");
+            break;
+        }
+    }
+}
+
+void activate()
+{
+    active = true;
+    tft.fillRect(0, 0, tftWidth, menuY, RGBto565(54,54,54));
+    // fill in labels and cells for all motors and properties
+    for (int8_t entity = Entities_LeftMotor; entity <= Entities_AllMotors; entity++)
+    {
+        for (int8_t prop = MotorProperties_Goal; prop <= MotorProperties_DirectDrive; prop++)
+        {
+            drawTelemetry(entity, prop, 0);
+        }
+    }
+}
+
+void deactivate()
+{
+    active = false;
+}
+
+void processKey(PadKeys btn, int16_t x, int16_t y)
+{
+    
+    if (btn == PadKeys_start)
+    {
+        if (x != 0)
+            enabled = !enabled;
+        return;
+    }
+
+    if (enabled)
+    {
+        switch (btn)
+        {
+        case PadKeys_cross:
+            // kill all motor movement
+            VirtualBot::setEntityProperty(Entities_AllMotors, MotorProperties_Goal, 0);
+            for (PadKeys k = PadKeys_knob0; k <= PadKeys_knob3; k++)
+                Pad::setKnobValue(k, 0);
+            break;
+        case PadKeys_knob0Btn:
+        case PadKeys_knob1Btn:
+        case PadKeys_knob2Btn:
+            if (x != 0)
+            {
+                int ix = btn - PadKeys_knob0Btn;
+                VirtualBot::setEntityProperty(Entities_LeftMotor + ix, MotorProperties_Goal, 0);
+                Pad::setKnobValue((PadKeys)(PadKeys_knob0 + ix), 0);
+            }
+            break;
+        case PadKeys_knob0:
+        case PadKeys_knob1:
+        case PadKeys_knob2:
+            {
+                Entities entity = (Entities)(Entities_LeftMotor + (btn - PadKeys_knob0));
+                VirtualBot::setEntityProperty(entity, MotorProperties_Goal, (int8_t)x);
+            }
+            break;    
+        case PadKeys_knob3Btn:
+        case PadKeys_knob3:
+            break;
+        }
+    }
+    else
+    {
+        switch (btn)
+        {
+        case PadKeys_knob0:
+        case PadKeys_knob1:
+        case PadKeys_knob2:
+            {
+                // while disabled, force knob to stay at current goals
+                Entities entity = (Entities)(Entities_LeftMotor + btn - PadKeys_knob0);
+                int8_t goal = VirtualBot::getEntityProperty(entity, MotorProperties_Goal);
+                Pad::setKnobValue(btn, goal);
+            }
+            break;    
+        }
+    }
+}
+
 void flush()
 {
     uint8_t packet[12];
@@ -156,21 +289,24 @@ void flush()
     uint8_t len = 0;
     for (int8_t entity = Entities_LeftMotor; entity <= Entities_RearMotor; entity++)
     {
-        for (int8_t prop = MotorProperties_Goal; entity <= MotorProperties_DirectDrive; entity++)
+        for (int8_t prop = MotorProperties_Goal; prop <= MotorProperties_DirectDrive; prop++)
         {
-            if (prop == MotorProperties_RPM)   // skip readonly
-                continue;
             if (getEntityPropertyChanged(entity, prop))
             {
                 int8_t value = getEntityProperty(entity, prop);
-                *p++ = entity << 4 | prop;
-                *p++ = (int8_t)value;
-                len += 2;
-                if (len >= sizeof(packet))
+                if (prop != MotorProperties_RPM)   // skip readonly
                 {
-                    floge("packet buffer too small");
-                    break;
+                    *p++ = entity << 4 | prop;
+                    *p++ = (int8_t)value;
+                    len += 2;
+                    if (len >= sizeof(packet))
+                    {
+                        floge("packet buffer too small");
+                        break;
+                    }
                 }
+                if (active)
+                    drawTelemetry(entity, prop, value);
             }
         }
     }

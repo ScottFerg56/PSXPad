@@ -3,11 +3,10 @@
 
 #include "PSXPad.h"
 
-typedef void (*pad_cb)(PadKeys btn, int16_t x, int16_t y);
-
 namespace Echo
 {
 void activate();
+void deactivate();
 void processKey(PadKeys btn, int16_t x, int16_t y);
 };
 

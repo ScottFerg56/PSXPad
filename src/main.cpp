@@ -12,11 +12,6 @@
 
 uint8_t botMacAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
 
-uint16_t RGBto565(uint8_t r, uint8_t g, uint8_t b)
-{
-    return ((r / 8) << 11) | ((g / 4) << 5) | (b / 8);
-}
-
 enum MenuItems
 {
     Menu_Telemetry,
@@ -33,23 +28,33 @@ void selectMenuItem(int newItem)
     if (newItem != menuItem)
     {
         menu[menuItem].drawButton(false);
-        menuItem = newItem;
-        menu[menuItem].drawButton(true);
-        tft.setTextColor(HX8357_WHITE);
         switch (menuItem)
         {
         case Menu_Echo:
-            tft.setCursor(0,0);
+            Echo::deactivate();
+            break;
+        case Menu_Telemetry:
+            VirtualBot::deactivate();
+            break;
+        case Menu_Log:
+        case Menu_TBD:
+            break;
+        }
+        menuItem = newItem;
+        menu[menuItem].drawButton(true);
+        tft.setTextColor(HX8357_WHITE);
+        tft.setCursor(0,0);
+        switch (menuItem)
+        {
+        case Menu_Echo:
             Echo::activate();
             break;
         case Menu_Telemetry:
+            VirtualBot::activate();
+            break;
         case Menu_Log:
         case Menu_TBD:
             tft.fillRect(0, 0, tftWidth, menuY, HX8357_BLACK);
-            tft.setCursor(0,0);
-            break;
-        
-        default:
             break;
         }
     }
@@ -77,7 +82,9 @@ TS_Point lastTSpt;
 
 int flog_printer(const char* s)
 {
-    Serial.print(s);
+    int len = Serial.print(s);
+    if (menuItem != Menu_Log)
+        return len;
     // 12x16 characters
     int16_t y = tft.getCursorY();
     if (y >= tft.height())
@@ -153,7 +160,7 @@ void setup(void)
         menu[i].initButtonUL(&tft, x, menuY, menuItemWidth, menuItemHeight, HX8357_WHITE, RGBto565(0x50,0x50,0x50), RGBto565(0xB0,0xB0,0xB0), (char*)label, 2);
         menu[i].drawButton();
     }
-    selectMenuItem(Menu_Echo);
+    selectMenuItem(Menu_Telemetry);
 }
 
 unsigned long timeInputLast = 0;
@@ -169,26 +176,8 @@ void padCallback(PadKeys btn, int16_t x, int16_t y)
         if (x != 0)
             selectNextMenuItem();
         break;
-    case PadKeys_knob0Btn:
-    case PadKeys_knob1Btn:
-    case PadKeys_knob2Btn:
-    case PadKeys_knob3Btn:
-        if (x != 0)
-            Pad::setKnobValue((PadKeys)(btn+4), 0);
-        break;
-    case PadKeys_knob0:
-    case PadKeys_knob1:
-    case PadKeys_knob2:
-        {
-            Entities entity = (Entities)(Entities_LeftMotor + (btn - PadKeys_knob0));
-            VirtualBot::setEntityProperty(entity, MotorProperties_Goal, (int8_t)x);
-        }
-        break;    
-    case PadKeys_knob3:
-        break;
-    default:
-        break;
     }
+    VirtualBot::processKey(btn, x, y);
 }
 
 void loop()

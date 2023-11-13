@@ -1,5 +1,5 @@
 #include "VirtualMotor.h"
-//#include "PSXPad.h"
+#include "FLogger.h"
 
 void VirtualMotor::setProperty(int8_t property, int8_t value)
 {

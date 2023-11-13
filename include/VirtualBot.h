@@ -3,6 +3,7 @@
 
 #include "\Projects\Rovio\RovioMotor\include\Packet.h"
 #include "VirtualMotor.h"
+#include "PSXPad.h"
 
 namespace VirtualBot
 {
@@ -14,6 +15,9 @@ namespace VirtualBot
     const char* getEntityPropertyName(int8_t entity, int8_t property);
     void flush();
     void doplot();
+    void activate();
+    void deactivate();
+    void processKey(PadKeys btn, int16_t x, int16_t y);
 };
 
 #endif // _VIRTUALBOT_H

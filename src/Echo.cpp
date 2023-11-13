@@ -1,4 +1,3 @@
-//#include <DigitalPin.h>
 #include "Echo.h"
 #include "FLogger.h"
 
@@ -169,6 +168,10 @@ void activate()
     padX = (tftWidth - imgPSXPad.width()) / 2;
     padY = menuY - imgPSXPad.height() - 4;
     imgPSXPad.draw(tft, padX, padY);
+}
+
+void deactivate()
+{
 }
 
 };

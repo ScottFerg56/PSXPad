@@ -6,6 +6,12 @@
 #include <Adafruit_STMPE610.h>
 #include <Adafruit_ImageReader.h> // Image-reading functions
 
+inline uint16_t RGBto565(uint8_t r, uint8_t g, uint8_t b)
+{
+    return ((r / 8) << 11) | ((g / 4) << 5) | (b / 8);
+}
+
+
 #define plot(name1, name2, v) do {} while(0)
 //#define plot(name1, name2, v) Serial.printf(">%s %s:%i\r\n", name1, name2, (int)(v))
 
@@ -72,10 +78,19 @@ enum PadKeys
     PadKeys_knob3,
 };
 
+// prefix ++
 inline PadKeys& operator++(PadKeys& k)
 {
     k = (PadKeys)((int)k + 1);
     return k;
+}
+
+// postfix ++
+inline PadKeys operator++(PadKeys& k, int)
+{
+    PadKeys o = k;
+    k = (PadKeys)((int)k + 1);
+    return o;
 }
 
 #endif // _PSXPAD_H
