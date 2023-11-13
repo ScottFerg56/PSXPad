@@ -6,6 +6,7 @@
 #include "PSXPad.h"
 #include "VirtualBot.h"
 #include "Pad.h"
+#include "Echo.h"
 
 // E8:9F:6D:22:02:EC
 
@@ -27,9 +28,6 @@ enum MenuItems
 Adafruit_GFX_Button menu[4];
 int menuItem = Menu_TBD;
 
-extern void DBinit();
-extern void DBEcho(PadKeys btn, int16_t x, int16_t y);
-
 void selectMenuItem(int newItem)
 {
     if (newItem != menuItem)
@@ -42,7 +40,7 @@ void selectMenuItem(int newItem)
         {
         case Menu_Echo:
             tft.setCursor(0,0);
-            DBinit();
+            Echo::activate();
             break;
         case Menu_Telemetry:
         case Menu_Log:
@@ -164,7 +162,7 @@ unsigned long timePlotLast = 0;
 void padCallback(PadKeys btn, int16_t x, int16_t y)
 {
     if (menuItem == Menu_Echo)
-        DBEcho(btn, x, y);
+        Echo::processKey(btn, x, y);
     switch (btn)
     {
     case PadKeys_select:

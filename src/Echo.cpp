@@ -1,7 +1,9 @@
-#include <arduino.h>
-#include <DigitalPin.h>
-#include "PSXPad.h"
+//#include <DigitalPin.h>
+#include "Echo.h"
 #include "FLogger.h"
+
+namespace Echo
+{
 
 int16_t padX = 0;
 int16_t padY = 0;
@@ -114,7 +116,7 @@ void drawButton(PadKeys btn, bool red)
         img.draw(tft, pt.x + padX, pt.y + padY);
 }
 
-void DBEcho(PadKeys btn, int16_t x, int16_t y)
+void processKey(PadKeys btn, int16_t x, int16_t y)
 {
     bool zeroed = x == 0 && y == 0;
     drawButton(btn, !zeroed);
@@ -152,7 +154,7 @@ void DBEcho(PadKeys btn, int16_t x, int16_t y)
     }
 }
 
-void DBinit()
+void activate()
 {
     tft.fillRect(0, 0, tftWidth, menuY, HX8357_BLUE);
 	if (imgPSXPad.getFormat() == IMAGE_NONE)
@@ -168,3 +170,5 @@ void DBinit()
     padY = menuY - imgPSXPad.height() - 4;
     imgPSXPad.draw(tft, padX, padY);
 }
+
+};
