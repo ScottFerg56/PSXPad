@@ -16,6 +16,50 @@ Point EntityScreenMap[] =
     { 216,  32},  // all motors (labels)
 };
 
+//
+// from "Motion Planning for Omnidirectional Wheeled Mobile Robot by Potential Field Method" equation (7)
+// as computed by independent program 'OmniCtrl'
+// the matrix, from columns A1, A2, and A3
+// which will be multiplied by the robot velocity and spin vector to produce the wheel rotation vector
+//
+float M00 = -0.0110, M01 = -0.0235, M02 = 2.7273;
+float M10 =	-0.0110, M11 =  0.0235, M12 = 2.7273;
+float M20 =  0.0260, M21 =  0.0000, M22 = 3.7662;
+
+//
+// the desired robot velocity x and y components and the desired rotational velocity in radians
+//
+float velOx = 0, velOy = 0, velOw = 0;
+
+//
+// the output wheel rotational velocities in radians
+//
+float velW0 = 0, velW1 = 0, velW2 = 0;
+
+int8_t rpm0 = 0, rpm1 = 0, rpm2 = 0;
+
+void Guidance()
+{
+    //velW = M * velO;
+    velW0 = M00 * velOx + M01 * velOy + M02 * velOw;
+    velW1 = M10 * velOx + M11 * velOy + M12 * velOw;
+    velW2 = M20 * velOx + M21 * velOy + M22 * velOw;
+    //Serial.printf("velO: %f %f %f\r\n", velOx, velOy, velOw);
+    //Serial.printf("velW: %f %f %f\r\n", velW0, velW1, velW2);
+    // Given our stick inputs, used for the input values, are arbitrary
+    // and max out at 100, that makes our rotational radians rather arbitrary
+    // and max out around 2.4.
+    // So use an arbitrary multiplier designed to max out our desired RPMs around 100...
+    rpm0 = (int8_t)roundf(velW0 * 40);
+    rpm1 = (int8_t)roundf(velW1 * 40);
+    rpm2 = (int8_t)roundf(velW2 * 40);
+    if (abs(rpm0) > 100 || abs(rpm1) > 100 || abs(rpm2) > 100)
+        return;
+    VirtualBot::setEntityProperty(Entities_LeftMotor, MotorProperties_Goal, -rpm0);
+    VirtualBot::setEntityProperty(Entities_RightMotor, MotorProperties_Goal, rpm1);
+    VirtualBot::setEntityProperty(Entities_RearMotor, MotorProperties_Goal, rpm2);
+}
+
 esp_now_peer_info_t peerInfo;
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
@@ -239,6 +283,24 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
             VirtualBot::setEntityProperty(Entities_AllMotors, MotorProperties_Goal, 0);
             for (PadKeys k = PadKeys_knob0; k <= PadKeys_knob3; k++)
                 Pad::setKnobValue(k, 0);
+            break;
+        case PadKeys_leftStick:
+            velOx = x;
+            velOy = y;
+            Guidance();
+            break;
+        case PadKeys_rightStick:
+            velOw = -x / 140.0f;
+            velOy = y;
+            Guidance();
+            break;
+        case PadKeys_left:
+            velOw = x / 350.0f;     // TODO: tune
+            Guidance();
+            break;
+        case PadKeys_right:
+            velOw = -x / 350.0f;    // TODO: tune
+            Guidance();
             break;
         case PadKeys_knob0Btn:
         case PadKeys_knob1Btn:
