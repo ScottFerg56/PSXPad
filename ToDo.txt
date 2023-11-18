@@ -1,5 +1,5 @@
 Rovio:
-    send feedback more often to controller
+    
 
 UI Pages:
     Echo - echoes PSX & knobs; (menu) option to passthru to robot
