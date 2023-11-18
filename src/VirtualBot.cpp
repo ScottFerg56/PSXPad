@@ -93,6 +93,8 @@ const char* getEntityPropertyName(int8_t entity, int8_t property)
             return "Goal";
         case MotorProperties_RPM:
             return "RPM";
+        case MotorProperties_Power:
+            return "Powr";
         case MotorProperties_DirectDrive:
             return "DD";
         default:
@@ -175,7 +177,7 @@ void drawTelemetry(int8_t entity, int8_t prop, int8_t value)
     case MotorProperties_RPM:
         y += charHeight + telMargin * 2 + telSpacing;
         break;
-    case MotorProperties_DirectDrive:
+    case MotorProperties_Power:
         y += 2 * (charHeight + telMargin * 2 + telSpacing);
         break;
     }
@@ -192,11 +194,8 @@ void drawTelemetry(int8_t entity, int8_t prop, int8_t value)
         {
         case MotorProperties_Goal:
         case MotorProperties_RPM:
+        case MotorProperties_Power:
             tft.printf("%4i", value);
-            break;
-        case MotorProperties_DirectDrive:
-            if (value != 0)
-                tft.print(" DD ");
             break;
         }
     }
@@ -209,7 +208,7 @@ void activate()
     // fill in labels and cells for all motors and properties
     for (int8_t entity = Entities_LeftMotor; entity <= Entities_AllMotors; entity++)
     {
-        for (int8_t prop = MotorProperties_Goal; prop <= MotorProperties_DirectDrive; prop++)
+        for (int8_t prop = MotorProperties_Goal; prop <= MotorProperties_Power; prop++)
         {
             drawTelemetry(entity, prop, 0);
         }
@@ -294,7 +293,7 @@ void flush()
             if (getEntityPropertyChanged(entity, prop))
             {
                 int8_t value = getEntityProperty(entity, prop);
-                if (prop != MotorProperties_RPM)   // skip readonly
+                if (prop != MotorProperties_RPM && prop != MotorProperties_Power)   // skip readonly
                 {
                     *p++ = entity << 4 | prop;
                     *p++ = (int8_t)value;

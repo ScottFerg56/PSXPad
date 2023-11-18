@@ -1,6 +1,9 @@
 #include "VirtualMotor.h"
 #include "FLogger.h"
 
+bool VirtualMotor::DirectDrive = false;
+bool VirtualMotor::DirectDriveChanged = false;
+
 void VirtualMotor::setProperty(int8_t property, int8_t value)
 {
     switch (property)
@@ -11,6 +14,10 @@ void VirtualMotor::setProperty(int8_t property, int8_t value)
 
     case MotorProperties_RPM:
         setRPM(value);
+        break;
+    
+    case MotorProperties_Power:
+        setPower(value);
         break;
     
     case MotorProperties_DirectDrive:
@@ -32,6 +39,9 @@ int8_t VirtualMotor::getProperty(int8_t property)
 
     case MotorProperties_RPM:
         return RPM;
+    
+    case MotorProperties_Power:
+        return Power;
     
     case MotorProperties_DirectDrive:
         return (int8_t)DirectDrive;
@@ -55,6 +65,11 @@ bool VirtualMotor::getPropertyChanged(int8_t property)
     case MotorProperties_RPM:
         changed = RPMChanged;
         RPMChanged = false;
+        break;
+    
+    case MotorProperties_Power:
+        changed = PowerChanged;
+        PowerChanged = false;
         break;
     
     case MotorProperties_DirectDrive:
