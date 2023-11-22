@@ -16,6 +16,17 @@ Point EntityScreenMap[] =
     { 216,  32},  // all motors (labels)
 };
 
+enum ControlModes
+{
+    Control_Disabled,
+    Control_Unlimited,
+    Control_Limited,
+};
+
+ControlModes ControlMode = Control_Limited;
+
+float factorMode = 0.5f;
+
 //
 // from "Motion Planning for Omnidirectional Wheeled Mobile Robot by Potential Field Method" equation (7)
 // as computed by independent program 'OmniCtrl'
@@ -222,7 +233,6 @@ bool getEntityPropertyChanged(int8_t entity, int8_t property)
 }
 
 bool active = true;
-bool enabled = true;
 
 const int8_t telMargin = 3;
 const int8_t telSpacing = 5;
@@ -262,6 +272,30 @@ void drawTelemetry(int8_t entity, int8_t prop, int8_t value)
     }
 }
 
+void drawControlMode()
+{
+    int x = 12;
+    int y = 32;
+    tft.setCursor(x, y);
+    tft.fillRect(x-telMargin, y-telMargin, 9 * charWidth + telMargin*2, charHeight + telMargin*2, HX8357_BLACK);
+    switch (ControlMode)
+    {
+    case Control_Disabled:
+        tft.setTextColor(HX8357_RED);
+        tft.print("Disabled");
+        break;
+    case Control_Unlimited:
+        tft.setTextColor(HX8357_GREEN);
+        tft.print("Unlimited");
+        break;
+    case Control_Limited:
+        tft.setTextColor(HX8357_YELLOW);
+        tft.print("Limited");
+        break;
+    }
+    tft.setTextColor(HX8357_WHITE);
+}
+
 void activate()
 {
     active = true;
@@ -272,6 +306,7 @@ void activate()
         for (int8_t prop = MotorProperties_Goal; prop <= MotorProperties_Power; prop++)
         {
             drawTelemetry(entity, prop, 0);
+            drawControlMode();
         }
     }
 }
@@ -287,11 +322,28 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
     if (btn == PadKeys_start)
     {
         if (x != 0)
-            enabled = !enabled;
+        {
+            switch (ControlMode)
+            {
+            case Control_Disabled:
+                ControlMode = Control_Unlimited;
+                factorMode = 1;
+                break;
+            case Control_Unlimited:
+                ControlMode = Control_Limited;
+                factorMode = 0.5f;
+                break;
+            case Control_Limited:
+                ControlMode = Control_Disabled;
+                factorMode = 0;
+                break;
+            }
+            drawControlMode();
+        }
         return;
     }
 
-    if (enabled)
+    if (ControlMode != Control_Disabled)
     {
         switch (btn)
         {
@@ -303,24 +355,24 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
             break;
         case PadKeys_leftStick:
             // 'translate'
-            velOx = x * factorTrans;
-            velOy = y * factorTrans;
+            velOx = x * factorTrans * factorMode;
+            velOy = y * factorTrans * factorMode;
             Guidance();
             break;
         case PadKeys_rightStick:
             // 'tractor'
-            velOw = -x * factorSpinT;
-            velOy = y * factorTrans;
+            velOw = -x * factorSpinT * factorMode;
+            velOy = y * factorTrans * factorMode;
             Guidance();
             break;
         case PadKeys_left:
             // 'spin' left
-            velOw = x * factorSpin;
+            velOw = x * factorSpin * factorMode;
             Guidance();
             break;
         case PadKeys_right:
             // 'spin' right
-            velOw = -x * factorSpin;
+            velOw = -x * factorSpin * factorMode;
             Guidance();
             break;
         case PadKeys_knob0Btn:

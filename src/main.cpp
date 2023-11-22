@@ -21,7 +21,7 @@ enum MenuItems
 };
 
 Adafruit_GFX_Button menu[4];
-int menuItem = Menu_TBD;
+int menuItem = Menu_Log;
 
 void selectMenuItem(int newItem)
 {

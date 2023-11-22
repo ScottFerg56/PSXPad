@@ -1,4 +1,4 @@
-Limited (vs unlimited) stick mode
+explore RPM lower limit under load
 add accel motor setting
 
 Rovio:
