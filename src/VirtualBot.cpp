@@ -38,6 +38,23 @@ float velW0 = 0, velW1 = 0, velW2 = 0;
 
 int8_t rpm0 = 0, rpm1 = 0, rpm2 = 0;
 
+// the following have been designed using the external OmniCtrl program to limit motor RPMs to 100:
+// 'translate' mode multiplier for arbitrary X & Y stick values [-100..100],
+//      converting to actual bot X & Y translation speeds (mm/sec)
+const float factorTrans = 4.031f;
+
+// 'tractor' mode multiplier for arbitrary X stick values [-100..100] controlling spin,
+//      converting to actual rotation speed (radians/sec)
+// Y stick deflection controls forward translation as in translate mode
+const float factorSpinT = 0.027f;
+
+// 'spin' mode multiplier for arbitrary button values [0..255],
+//      converting to actual rotation speed (radians/sec)
+const float factorSpin = (0.027f * 100.0f) / 255.0f;
+
+// convert rotation in radians/sec to RPM
+const float rot2RPM = 60.0f / (2 * PI);
+
 void Guidance()
 {
     //velW = M * velO;
@@ -50,9 +67,9 @@ void Guidance()
     // and max out at 100, that makes our rotational radians rather arbitrary
     // and max out around 2.4.
     // So use an arbitrary multiplier designed to max out our desired RPMs around 100...
-    rpm0 = (int8_t)roundf(velW0 * 40);
-    rpm1 = (int8_t)roundf(velW1 * 40);
-    rpm2 = (int8_t)roundf(velW2 * 40);
+    rpm0 = (int8_t)roundf(velW0 * rot2RPM);
+    rpm1 = (int8_t)roundf(velW1 * rot2RPM);
+    rpm2 = (int8_t)roundf(velW2 * rot2RPM);
     if (abs(rpm0) > 100 || abs(rpm1) > 100 || abs(rpm2) > 100)
         return;
     VirtualBot::setEntityProperty(Entities_LeftMotor, MotorProperties_Goal, -rpm0);
@@ -285,21 +302,25 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
                 Pad::setKnobValue(k, 0);
             break;
         case PadKeys_leftStick:
-            velOx = x;
-            velOy = y;
+            // 'translate'
+            velOx = x * factorTrans;
+            velOy = y * factorTrans;
             Guidance();
             break;
         case PadKeys_rightStick:
-            velOw = -x / 140.0f;
-            velOy = y;
+            // 'tractor'
+            velOw = -x * factorSpinT;
+            velOy = y * factorTrans;
             Guidance();
             break;
         case PadKeys_left:
-            velOw = x / 350.0f;     // TODO: tune
+            // 'spin' left
+            velOw = x * factorSpin;
             Guidance();
             break;
         case PadKeys_right:
-            velOw = -x / 350.0f;    // TODO: tune
+            // 'spin' right
+            velOw = -x * factorSpin;
             Guidance();
             break;
         case PadKeys_knob0Btn:
