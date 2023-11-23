@@ -8,12 +8,12 @@
 namespace VirtualBot
 {
 VirtualMotor Motors[3];
+
 Point EntityScreenMap[] =
 {
 	{ 144,  32},  // left motor
     { 288,  32},  // right motor
     { 216, 120},  // rear motor
-    { 216,  32},  // all motors (labels)
 };
 
 enum ControlModes
@@ -83,9 +83,9 @@ void Guidance()
     rpm2 = (int8_t)roundf(velW2 * rot2RPM);
     if (abs(rpm0) > 100 || abs(rpm1) > 100 || abs(rpm2) > 100)
         return;
-    VirtualBot::setEntityProperty(Entities_LeftMotor, MotorProperties_Goal, -rpm0);
-    VirtualBot::setEntityProperty(Entities_RightMotor, MotorProperties_Goal, rpm1);
-    VirtualBot::setEntityProperty(Entities_RearMotor, MotorProperties_Goal, rpm2);
+    VirtualBot::setEntityProperty(Entities_LeftMotor, Properties_Goal, -rpm0);
+    VirtualBot::setEntityProperty(Entities_RightMotor, Properties_Goal, rpm1);
+    VirtualBot::setEntityProperty(Entities_RearMotor, Properties_Goal, rpm2);
 }
 
 esp_now_peer_info_t peerInfo;
@@ -98,19 +98,14 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *pData, int len)
 {
-    if (len == 0 || (len % 4) != 0)
+    Packet packet;
+    int cnt = len / sizeof(Packet);
+    while (cnt > 0)
     {
-        floge("invalid data packet length");
-        return;
-    }
-    while (len >= 4)
-    {
-        uint8_t entity = *pData++;
-        uint8_t property = *pData++;
-        int16_t value = *pData++;
-        value |= *pData++ << 8;
-        len -= 4;
-        setEntityProperty(entity, property, value);
+        memcpy(&packet, pData, sizeof(Packet));
+        pData += sizeof(Packet);
+        cnt--;
+        setEntityProperty(packet.entity, packet.property, packet.value);
     }
 }
 
@@ -137,7 +132,7 @@ void init(uint8_t addr[])
     esp_now_register_recv_cb(OnDataRecv);
 }
 
-const char* getEntityName(uint8_t entity)
+const char* getEntityName(Entities entity)
 {
     switch (entity)
     {
@@ -152,38 +147,29 @@ const char* getEntityName(uint8_t entity)
     }
 }
 
-const char* getEntityPropertyName(uint8_t entity, uint8_t property)
+const char* getPropertyName(Properties property)
 {
-    switch (entity)
+    switch (property)
     {
-    case Entities_LeftMotor:
-    case Entities_RightMotor:
-    case Entities_RearMotor:
-    case Entities_AllMotors:
-        switch (property)
-        {
-        case MotorProperties_Goal:
-            return "Goal";
-        case MotorProperties_RPM:
-            return "RPM";
-        case MotorProperties_Power:
-            return "Powr";
-        case MotorProperties_DirectDrive:
-            return "DD";
-        default:
-            return "***";
-        }
+    case Properties_Goal:
+        return "Goal";
+    case Properties_RPM:
+        return "RPM";
+    case Properties_Power:
+        return "Powr";
+    case Properties_DirectDrive:
+        return "DD";
     default:
         return "***";
     }
 }
 
-VirtualMotor& getMotor(uint8_t entity)
+VirtualMotor& getMotor(Entities entity)
 {
     return Motors[entity - Entities_LeftMotor];
 }
 
-void setEntityProperty(uint8_t entity, uint8_t property, int16_t value)
+void setEntityProperty(Entities entity, Properties property, int16_t value)
 {
     switch (entity)
     {
@@ -193,17 +179,12 @@ void setEntityProperty(uint8_t entity, uint8_t property, int16_t value)
         getMotor(entity).setProperty(property, value);
         break;
 
-    case Entities_AllMotors:
-        for (int8_t m = Entities_LeftMotor; m <= Entities_RearMotor; m++)
-            getMotor(m).setProperty(property, value);
-        break;
-    
     default:    // invalid enity
         break;
     }
 }
 
-int16_t getEntityProperty(uint8_t entity, uint8_t property)
+int16_t getEntityProperty(Entities entity, Properties property)
 {
     switch (entity)
     {
@@ -212,13 +193,12 @@ int16_t getEntityProperty(uint8_t entity, uint8_t property)
     case Entities_RearMotor:
         return getMotor(entity).getProperty(property);
 
-    case Entities_AllMotors:    // invalid
     default:    // invalid enity
         return -1;
     }
 }
 
-bool getEntityPropertyChanged(uint8_t entity, uint8_t property)
+bool getEntityPropertyChanged(Entities entity, Properties property)
 {
     switch (entity)
     {
@@ -226,90 +206,107 @@ bool getEntityPropertyChanged(uint8_t entity, uint8_t property)
     case Entities_RightMotor:
     case Entities_RearMotor:
         return getMotor(entity).getPropertyChanged(property);
-
-    case Entities_AllMotors:    // invalid
-    default:    // invalid enity
-        return false;
     }
+    return false;
 }
 
 bool active = true;
 
-const int8_t telMargin = 3;
-const int8_t telSpacing = 5;
-void drawTelemetry(int8_t entity, int8_t prop, int8_t value)
+struct Ctrl
 {
-    int16_t x = EntityScreenMap[entity].x;
-    int16_t y = EntityScreenMap[entity].y;
+    Point location;
+    uint8_t width;
+    uint16_t textColor;
+    Entities entity;
+    Properties property;
+    const char* label;
+};
 
-    switch (prop)
+Ctrl ctrls[] =
+{
+    { { 144,  32 }, 4, HX8357_WHITE, Entities_LeftMotor,  Properties_Goal,  },
+    { { 288,  32 }, 4, HX8357_WHITE, Entities_RightMotor, Properties_Goal,  },
+    { { 216, 120 }, 4, HX8357_WHITE, Entities_RearMotor,  Properties_Goal,  },
+    { { 144,  59 }, 4, HX8357_WHITE, Entities_LeftMotor,  Properties_RPM,   },
+    { { 288,  59 }, 4, HX8357_WHITE, Entities_RightMotor, Properties_RPM,   },
+    { { 216, 147 }, 4, HX8357_WHITE, Entities_RearMotor,  Properties_RPM,   },
+    { { 144,  85 }, 4, HX8357_WHITE, Entities_LeftMotor,  Properties_Power, },
+    { { 288,  85 }, 4, HX8357_WHITE, Entities_RightMotor, Properties_Power, },
+    { { 216, 174 }, 4, HX8357_WHITE, Entities_RearMotor,  Properties_Power, },
+    { { 216,  32 }, 4, HX8357_WHITE, Entities_None,       Properties_Goal,  },
+    { { 216,  59 }, 4, HX8357_WHITE, Entities_None,       Properties_RPM,   },
+    { { 216,  85 }, 4, HX8357_WHITE, Entities_None,       Properties_Power, },
+    { {  12,  32 }, 9, HX8357_GREEN, Entities_None,       Properties_ControlMode },
+};
+
+Ctrl& getCtrl(Entities entity, Properties property)
+{
+    for (int i = 0; i < sizeof(ctrls) / sizeof(Ctrl); i++)
     {
-    case MotorProperties_Goal:
-        break;
-    case MotorProperties_RPM:
-        y += charHeight + telMargin * 2 + telSpacing;
-        break;
-    case MotorProperties_Power:
-        y += 2 * (charHeight + telMargin * 2 + telSpacing);
-        break;
+        if (ctrls[i].entity == entity && ctrls[i].property == property)
+            return ctrls[i];
     }
-    // no descenders in our text, so a slight Y offset to better center vertically
-    tft.setCursor(x, y+1);
-    tft.fillRect(x-telMargin, y-telMargin, 4 * charWidth + telMargin*2, charHeight + telMargin*2, HX8357_BLACK);
-    if (entity == Entities_AllMotors)
+    return ctrls[0];
+}
+
+const int8_t telMargin = 3;
+void drawCtrl(Ctrl& ctrl)
+{
+    int16_t x = ctrl.location.x;
+    int16_t y = ctrl.location.y;
+    tft.setCursor(x, y + 1);
+    tft.fillRect(x-telMargin, y-telMargin, ctrl.width * charWidth + telMargin*2, charHeight + telMargin*2, HX8357_BLACK);
+    tft.setTextColor(ctrl.textColor);
+    if (ctrl.entity != Entities_None)
     {
-        tft.print(getEntityPropertyName(entity, prop));
+        tft.printf("%*i", ctrl.width, getEntityProperty(ctrl.entity, ctrl.property));
     }
     else
     {
-        switch (prop)
+        switch (ctrl.property)
         {
-        case MotorProperties_Goal:
-        case MotorProperties_RPM:
-        case MotorProperties_Power:
-            tft.printf("%4i", value);
+        case Properties_ControlMode:
+            switch (ControlMode)
+            {
+            case Control_Disabled:
+                tft.print("Disabled");
+                break;
+            case Control_Unlimited:
+                tft.print("Unlimited");
+                break;
+            case Control_Limited:
+                tft.print("Limited");
+                break;
+            }
+            break;
+        
+        default:
+            tft.print(getPropertyName(ctrl.property));
             break;
         }
     }
+    tft.setTextColor(HX8357_WHITE);
 }
 
-void drawControlMode()
+void drawTelemetry()
 {
-    int16_t x = 12;
-    int16_t y = 32;
-    tft.setCursor(x, y);
-    tft.fillRect(x-telMargin, y-telMargin, 9 * charWidth + telMargin*2, charHeight + telMargin*2, HX8357_BLACK);
-    switch (ControlMode)
+    for (int i = 0; i < sizeof(ctrls) / sizeof(Ctrl); i++)
     {
-    case Control_Disabled:
-        tft.setTextColor(HX8357_RED);
-        tft.print("Disabled");
-        break;
-    case Control_Unlimited:
-        tft.setTextColor(HX8357_GREEN);
-        tft.print("Unlimited");
-        break;
-    case Control_Limited:
-        tft.setTextColor(HX8357_YELLOW);
-        tft.print("Limited");
-        break;
+        drawCtrl(ctrls[i]);
     }
-    tft.setTextColor(HX8357_WHITE);
+}
+
+void drawCtrl(Entities entity, Properties property)
+{
+    Ctrl& ctrl = getCtrl(entity, property);
+    drawCtrl(ctrl);
 }
 
 void activate()
 {
     active = true;
     tft.fillRect(0, 0, tftWidth, menuY, RGBto565(54,54,54));
-    // fill in labels and cells for all motors and properties
-    for (int8_t entity = Entities_LeftMotor; entity <= Entities_AllMotors; entity++)
-    {
-        for (int8_t prop = MotorProperties_Goal; prop <= MotorProperties_Power; prop++)
-        {
-            drawTelemetry(entity, prop, 0);
-            drawControlMode();
-        }
-    }
+    drawTelemetry();
 }
 
 void deactivate()
@@ -324,22 +321,26 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
     {
         if (x != 0)
         {
+            Ctrl& ctrl = getCtrl(Entities_None, Properties_ControlMode);
             switch (ControlMode)
             {
             case Control_Disabled:
                 ControlMode = Control_Unlimited;
+                ctrl.textColor = HX8357_YELLOW;
                 factorMode = 1;
                 break;
             case Control_Unlimited:
                 ControlMode = Control_Limited;
+                ctrl.textColor = HX8357_GREEN;
                 factorMode = 0.5f;
                 break;
             case Control_Limited:
                 ControlMode = Control_Disabled;
+                ctrl.textColor = HX8357_RED;
                 factorMode = 0;
                 break;
             }
-            drawControlMode();
+            drawCtrl(ctrl);
         }
         return;
     }
@@ -350,7 +351,8 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
         {
         case PadKeys_cross:
             // kill all motor movement
-            VirtualBot::setEntityProperty(Entities_AllMotors, MotorProperties_Goal, 0);
+            for (Entities m = Entities_LeftMotor; m <= Entities_RearMotor; m++)
+                getMotor(m).setGoal(0);
             for (PadKeys k = PadKeys_knob0; k <= PadKeys_knob3; k++)
                 Pad::setKnobValue(k, 0);
             break;
@@ -382,7 +384,7 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
             if (x != 0)
             {
                 int ix = btn - PadKeys_knob0Btn;
-                VirtualBot::setEntityProperty(Entities_LeftMotor + ix, MotorProperties_Goal, 0);
+                VirtualBot::setEntityProperty((Entities)(Entities_LeftMotor + ix), Properties_Goal, 0);
                 Pad::setKnobValue((PadKeys)(PadKeys_knob0 + ix), 0);
             }
             break;
@@ -391,7 +393,7 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
         case PadKeys_knob2:
             {
                 Entities entity = (Entities)(Entities_LeftMotor + (btn - PadKeys_knob0));
-                VirtualBot::setEntityProperty(entity, MotorProperties_Goal, (int8_t)x);
+                VirtualBot::setEntityProperty(entity, Properties_Goal, (int8_t)x);
             }
             break;    
         case PadKeys_knob3Btn:
@@ -409,7 +411,7 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
             {
                 // while disabled, force knob to stay at current goals
                 Entities entity = (Entities)(Entities_LeftMotor + btn - PadKeys_knob0);
-                int8_t goal = VirtualBot::getEntityProperty(entity, MotorProperties_Goal);
+                int8_t goal = VirtualBot::getEntityProperty(entity, Properties_Goal);
                 Pad::setKnobValue(btn, goal);
             }
             break;    
@@ -419,56 +421,51 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
 
 void flush()
 {
-    uint8_t packet[32];     // enough for at least 4 entities, with 2 properties and 4 bytes each
-    uint8_t *p = packet;
-    uint8_t len = 0;
-    for (int8_t entity = Entities_LeftMotor; entity <= Entities_RearMotor; entity++)
+    const int len = 10;
+    Packet packets[len];     // enough for a few properties
+    uint8_t cnt = 0;
+    for (Entities entity = firstEntity; entity <= lastEntity; entity++)
     {
-        for (int8_t prop = MotorProperties_Goal; prop <= MotorProperties_DirectDrive; prop++)
+        for (Properties prop = firstProperty; prop <= lastProperty; prop++)
         {
             if (getEntityPropertyChanged(entity, prop))
             {
-                int16_t value = getEntityProperty(entity, prop);
-                if (prop != MotorProperties_RPM && prop != MotorProperties_Power)   // skip readonly
+                if (cnt >= len)
                 {
-                    if (len + 4 >= sizeof(packet))
-                    {
-                        floge("packet buffer too small");
-                        break;
-                    }
-                    else
-                    {
-                        *p++ = entity;
-                        *p++ = prop;
-                        *p++ = (uint8_t)(value & 0xFF);
-                        *p++ = (uint8_t)(value >> 8);
-                        len += 4;
-                    }
+                    floge("packet buffer too small");
+                    break;
+                }
+                if (prop != Properties_RPM && prop != Properties_Power)   // skip readonly
+                {
+                    packets[cnt].entity = entity;
+                    packets[cnt].property = prop;
+                    packets[cnt].value = getEntityProperty(entity, prop);
+                    cnt++;
                 }
                 if (active)
-                    drawTelemetry(entity, prop, value);
+                    drawCtrl(entity, prop);
             }
         }
     }
-    if (len > 0)
+    if (cnt > 0)
     {
-        esp_err_t result = esp_now_send(peerInfo.peer_addr, (uint8_t*)&packet, len);
+        esp_err_t result = esp_now_send(peerInfo.peer_addr, (uint8_t*)&packets, cnt * sizeof(Packet));
         if (result != ESP_OK)
-            floge("Error sending the data");
+            floge("Error sending data");
     }
 }
 
-void plotEntityProperty(int8_t entity, int8_t property)
+void plotEntityProperty(Entities entity, Properties property)
 {
-    plot(getEntityName(entity), getEntityPropertyName(entity, property), getEntityProperty(entity, property));
+    plot(getEntityName(entity), getPropertyName(entity, property), getEntityProperty(entity, property));
 }
 
 void doplot()
 {
-    for (int8_t entity = Entities_LeftMotor; entity <= Entities_RearMotor; entity++)
+    for (Entities entity = Entities_LeftMotor; entity <= Entities_RearMotor; entity++)
     {
-        plotEntityProperty(entity, MotorProperties_Goal);
-        plotEntityProperty(entity, MotorProperties_RPM);
+        plotEntityProperty(entity, Properties_Goal);
+        plotEntityProperty(entity, Properties_RPM);
     }
 }
 };

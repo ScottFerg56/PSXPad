@@ -8,10 +8,10 @@
 namespace VirtualBot
 {
     void init(uint8_t addr[]);
-    void setEntityProperty(uint8_t entity, uint8_t property, int16_t value);
-    int16_t getEntityProperty(uint8_t entity, uint8_t property);
-    const char* getEntityName(uint8_t entity);
-    const char* getEntityPropertyName(uint8_t entity, uint8_t property);
+    void setEntityProperty(Entities entity, Properties property, int16_t value);
+    int16_t getEntityProperty(Entities entity, Properties property);
+    const char* getEntityName(Entities entity);
+    const char* getPropertyName(Properties property);
     void flush();
     void doplot();
     void activate();

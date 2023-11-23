@@ -8,19 +8,19 @@ void VirtualMotor::setProperty(int8_t property, int16_t value)
 {
     switch (property)
     {
-    case MotorProperties_Goal:
+    case Properties_Goal:
         setGoal(value);
         break;
 
-    case MotorProperties_RPM:
+    case Properties_RPM:
         setRPM(value);
         break;
     
-    case MotorProperties_Power:
+    case Properties_Power:
         setPower(value);
         break;
     
-    case MotorProperties_DirectDrive:
+    case Properties_DirectDrive:
         setDirectDrive(value != 0);
         break;
 
@@ -34,16 +34,16 @@ int16_t VirtualMotor::getProperty(int8_t property)
 {
     switch (property)
     {
-    case MotorProperties_Goal:
+    case Properties_Goal:
         return Goal;
 
-    case MotorProperties_RPM:
+    case Properties_RPM:
         return RPM;
     
-    case MotorProperties_Power:
+    case Properties_Power:
         return Power;
     
-    case MotorProperties_DirectDrive:
+    case Properties_DirectDrive:
         return (int16_t)DirectDrive;
 
     default:                    // invalid property
@@ -57,22 +57,22 @@ bool VirtualMotor::getPropertyChanged(int8_t property)
     bool changed = false;
     switch (property)
     {
-    case MotorProperties_Goal:
+    case Properties_Goal:
         changed = GoalChanged;
         GoalChanged = false;
         break;
 
-    case MotorProperties_RPM:
+    case Properties_RPM:
         changed = RPMChanged;
         RPMChanged = false;
         break;
     
-    case MotorProperties_Power:
+    case Properties_Power:
         changed = PowerChanged;
         PowerChanged = false;
         break;
     
-    case MotorProperties_DirectDrive:
+    case Properties_DirectDrive:
         changed = DirectDriveChanged;
         DirectDriveChanged = false;
         break;
