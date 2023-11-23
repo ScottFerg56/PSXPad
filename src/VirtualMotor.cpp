@@ -4,7 +4,7 @@
 bool VirtualMotor::DirectDrive = false;
 bool VirtualMotor::DirectDriveChanged = false;
 
-void VirtualMotor::setProperty(int8_t property, int16_t value)
+void VirtualMotor::setProperty(Properties property, int16_t value)
 {
     switch (property)
     {
@@ -30,7 +30,7 @@ void VirtualMotor::setProperty(int8_t property, int16_t value)
     }
 }
 
-int16_t VirtualMotor::getProperty(int8_t property)
+int16_t VirtualMotor::getProperty(Properties property)
 {
     switch (property)
     {
@@ -52,7 +52,7 @@ int16_t VirtualMotor::getProperty(int8_t property)
     }
 }
 
-bool VirtualMotor::getPropertyChanged(int8_t property)
+bool VirtualMotor::getPropertyChanged(Properties property)
 {
     bool changed = false;
     switch (property)
