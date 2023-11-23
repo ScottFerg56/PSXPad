@@ -24,9 +24,9 @@ public:
     inline void setPower(int16_t value) { PowerChanged = Power != value; Power = value; }
     inline int16_t getDirectDrive() { return DirectDrive; }
     inline void setDirectDrive(int16_t value) { DirectDrive = value; DirectDriveChanged = true; }
-    void setProperty(int8_t property, int16_t value);
-    int16_t getProperty(int8_t property);
-    bool getPropertyChanged(int8_t property);
+    void setProperty(Properties property, int16_t value);
+    int16_t getProperty(Properties property);
+    bool getPropertyChanged(Properties property);
 };
 
 #endif // _VIRTUALMOTOR_H
