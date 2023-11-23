@@ -4,7 +4,7 @@
 bool VirtualMotor::DirectDrive = false;
 bool VirtualMotor::DirectDriveChanged = false;
 
-void VirtualMotor::setProperty(int8_t property, int8_t value)
+void VirtualMotor::setProperty(int8_t property, int16_t value)
 {
     switch (property)
     {
@@ -30,7 +30,7 @@ void VirtualMotor::setProperty(int8_t property, int8_t value)
     }
 }
 
-int8_t VirtualMotor::getProperty(int8_t property)
+int16_t VirtualMotor::getProperty(int8_t property)
 {
     switch (property)
     {
@@ -44,7 +44,7 @@ int8_t VirtualMotor::getProperty(int8_t property)
         return Power;
     
     case MotorProperties_DirectDrive:
-        return (int8_t)DirectDrive;
+        return (int16_t)DirectDrive;
 
     default:                    // invalid property
         // UNDONE: error reporting

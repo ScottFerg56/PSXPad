@@ -98,17 +98,18 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *pData, int len)
 {
-    if (len == 0 || (len & 1) != 0)
+    if (len == 0 || (len % 4) != 0)
     {
         floge("invalid data packet length");
         return;
     }
-    while (len > 0)
+    while (len >= 4)
     {
-        int8_t entity = (*pData & 0xF0) >> 4;
-        int8_t property = *pData++ & 0x0F;
-        int8_t value = *pData++;
-        len -= 2;
+        uint8_t entity = *pData++;
+        uint8_t property = *pData++;
+        int16_t value = *pData++;
+        value |= *pData++ << 8;
+        len -= 4;
         setEntityProperty(entity, property, value);
     }
 }
@@ -136,7 +137,7 @@ void init(uint8_t addr[])
     esp_now_register_recv_cb(OnDataRecv);
 }
 
-const char* getEntityName(int8_t entity)
+const char* getEntityName(uint8_t entity)
 {
     switch (entity)
     {
@@ -151,7 +152,7 @@ const char* getEntityName(int8_t entity)
     }
 }
 
-const char* getEntityPropertyName(int8_t entity, int8_t property)
+const char* getEntityPropertyName(uint8_t entity, uint8_t property)
 {
     switch (entity)
     {
@@ -177,12 +178,12 @@ const char* getEntityPropertyName(int8_t entity, int8_t property)
     }
 }
 
-VirtualMotor& getMotor(int8_t entity)
+VirtualMotor& getMotor(uint8_t entity)
 {
     return Motors[entity - Entities_LeftMotor];
 }
 
-void setEntityProperty(int8_t entity, int8_t property, int8_t value)
+void setEntityProperty(uint8_t entity, uint8_t property, int16_t value)
 {
     switch (entity)
     {
@@ -202,7 +203,7 @@ void setEntityProperty(int8_t entity, int8_t property, int8_t value)
     }
 }
 
-int8_t getEntityProperty(int8_t entity, int8_t property)
+int16_t getEntityProperty(uint8_t entity, uint8_t property)
 {
     switch (entity)
     {
@@ -217,7 +218,7 @@ int8_t getEntityProperty(int8_t entity, int8_t property)
     }
 }
 
-bool getEntityPropertyChanged(int8_t entity, int8_t property)
+bool getEntityPropertyChanged(uint8_t entity, uint8_t property)
 {
     switch (entity)
     {
@@ -274,8 +275,8 @@ void drawTelemetry(int8_t entity, int8_t prop, int8_t value)
 
 void drawControlMode()
 {
-    int x = 12;
-    int y = 32;
+    int16_t x = 12;
+    int16_t y = 32;
     tft.setCursor(x, y);
     tft.fillRect(x-telMargin, y-telMargin, 9 * charWidth + telMargin*2, charHeight + telMargin*2, HX8357_BLACK);
     switch (ControlMode)
@@ -418,7 +419,7 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
 
 void flush()
 {
-    uint8_t packet[12];
+    uint8_t packet[32];     // enough for at least 4 entities, with 2 properties and 4 bytes each
     uint8_t *p = packet;
     uint8_t len = 0;
     for (int8_t entity = Entities_LeftMotor; entity <= Entities_RearMotor; entity++)
@@ -427,16 +428,21 @@ void flush()
         {
             if (getEntityPropertyChanged(entity, prop))
             {
-                int8_t value = getEntityProperty(entity, prop);
+                int16_t value = getEntityProperty(entity, prop);
                 if (prop != MotorProperties_RPM && prop != MotorProperties_Power)   // skip readonly
                 {
-                    *p++ = entity << 4 | prop;
-                    *p++ = (int8_t)value;
-                    len += 2;
-                    if (len >= sizeof(packet))
+                    if (len + 4 >= sizeof(packet))
                     {
                         floge("packet buffer too small");
                         break;
+                    }
+                    else
+                    {
+                        *p++ = entity;
+                        *p++ = prop;
+                        *p++ = (uint8_t)(value & 0xFF);
+                        *p++ = (uint8_t)(value >> 8);
+                        len += 4;
                     }
                 }
                 if (active)

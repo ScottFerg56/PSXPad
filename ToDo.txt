@@ -1,5 +1,8 @@
+direct mode factor changes
 explore RPM lower limit under load
-add accel motor setting
+add accel motor setting?
+'linear' mode vs PID; just direct movement to goal
+Freenove_ESP32_S3_WROOM_Board camera
 
 Rovio:
     head up/down

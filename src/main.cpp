@@ -21,9 +21,9 @@ enum MenuItems
 };
 
 Adafruit_GFX_Button menu[4];
-int menuItem = Menu_Log;
+MenuItems menuItem = Menu_Log;
 
-void selectMenuItem(int newItem)
+void selectMenuItem(MenuItems newItem)
 {
     if (newItem != menuItem)
     {
@@ -62,10 +62,19 @@ void selectMenuItem(int newItem)
 
 void selectNextMenuItem()
 {
-    int newItem = menuItem + 1;
-    if (newItem > Menu_TBD)
-        newItem = Menu_Telemetry;
-    selectMenuItem(newItem);
+    switch (menuItem)
+    {
+    case Menu_Telemetry:
+        selectMenuItem(Menu_Echo);
+        break;
+    case Menu_Echo:
+        selectMenuItem(Menu_Log);
+        break;
+    case Menu_Log:
+    default:
+        selectMenuItem(Menu_Telemetry);
+        break;
+    }
 }
 
 DigitalPin<LED_BUILTIN> led;
@@ -203,18 +212,14 @@ void loop()
                 y = tft.height() - y;
                 tft.fillCircle(x, y, 3, HX8357_MAGENTA);
                 //Serial.print("("); Serial.print(p.x); Serial.print(","); Serial.print(p.y); Serial.println(")");
-                int newItem = -1;
+                MenuItems newItem = menuItem;
                 for (int i = Menu_Telemetry; i <= Menu_TBD; i++)
                 {
                     if (menu[i].contains(x, y))
                     {
-                        newItem = i;
+                        selectMenuItem((MenuItems)i);
                         break;
                     }
-                }
-                if (newItem != -1)
-                {
-                    selectMenuItem(newItem);
                 }
             }
         }
