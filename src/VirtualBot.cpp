@@ -182,12 +182,12 @@ void setEntityProperty(Entities entity, Properties property, int16_t value)
         switch (property)
         {
         case Properties_Goal:  // TODO: for now just power
-            HeadGoalChanged = HeadGoal != value;
+            HeadGoalChanged |= HeadGoal != value;
             HeadGoal = value;
             break;
         
         case Properties_Power:  // TODO: for now just power
-            HeadPowerChanged = HeadPower != value;
+            HeadPowerChanged |= HeadPower != value;
             HeadPower = value;
             break;
         
@@ -288,8 +288,8 @@ Ctrl ctrls[] =
     { { 216,  59 }, 4, HX8357_WHITE, Entities_None,       Properties_RPM,   },
     { { 216,  85 }, 4, HX8357_WHITE, Entities_None,       Properties_Power, },
     { {  12,  32 }, 9, HX8357_GREEN, Entities_None,       Properties_ControlMode },
-    { {  12,  48 }, 4, HX8357_WHITE, Entities_Head,       Properties_Goal, },
-    { {  12,  54 }, 4, HX8357_WHITE, Entities_Head,       Properties_Power, },
+    { {  12,  59 }, 4, HX8357_WHITE, Entities_Head,       Properties_Goal, },
+    { {  12,  85 }, 4, HX8357_WHITE, Entities_Head,       Properties_Power, },
 };
 
 Ctrl& getCtrl(Entities entity, Properties property)
@@ -450,7 +450,14 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
             }
             break;    
         case PadKeys_knob3Btn:
+            if (x != 0)
+            {
+                VirtualBot::setEntityProperty(Entities_Head, Properties_Goal, 0);
+                Pad::setKnobValue(PadKeys_knob3, 0);
+            }
+            break;
         case PadKeys_knob3:
+            VirtualBot::setEntityProperty(Entities_Head, Properties_Goal, (int8_t)x);
             break;
         }
     }
@@ -461,6 +468,7 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
         case PadKeys_knob0:
         case PadKeys_knob1:
         case PadKeys_knob2:
+        case PadKeys_knob3:
             {
                 // while disabled, force knob to stay at current goals
                 Entities entity = (Entities)(Entities_LeftMotor + btn - PadKeys_knob0);

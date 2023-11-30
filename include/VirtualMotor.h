@@ -17,11 +17,11 @@ protected:
 
 public:
     inline int16_t getGoal() { return Goal; }
-    inline void setGoal(int16_t value) { GoalChanged = Goal != value; Goal = value; }
+    inline void setGoal(int16_t value) { GoalChanged |= Goal != value; Goal = value; }
     inline int16_t getRPM() { return RPM; }
-    inline void setRPM(int16_t value) { RPMChanged = RPM != value; RPM = value; }
+    inline void setRPM(int16_t value) { RPMChanged |= RPM != value; RPM = value; }
     inline int16_t getPower() { return Power; }
-    inline void setPower(int16_t value) { PowerChanged = Power != value; Power = value; }
+    inline void setPower(int16_t value) { PowerChanged |= Power != value; Power = value; }
     inline int16_t getDirectDrive() { return DirectDrive; }
     inline void setDirectDrive(int16_t value) { DirectDriveChanged = DirectDrive != value; DirectDrive = value; }
     void setProperty(Properties property, int16_t value);
