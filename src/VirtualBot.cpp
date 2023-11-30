@@ -8,13 +8,10 @@
 namespace VirtualBot
 {
 VirtualMotor Motors[3];
-
-Point EntityScreenMap[] =
-{
-	{ 144,  32},  // left motor
-    { 288,  32},  // right motor
-    { 216, 120},  // rear motor
-};
+int16_t HeadGoal = 0;
+bool HeadGoalChanged = false;
+int16_t HeadPower = 0;
+bool HeadPowerChanged = false;
 
 enum ControlModes
 {
@@ -142,6 +139,8 @@ const char* getEntityName(Entities entity)
         return "Right Motor";
     case Entities_RearMotor:
         return "Rear Motor";
+    case Entities_Head:
+        return "Head";
     default:
         return "***";
     }
@@ -179,6 +178,23 @@ void setEntityProperty(Entities entity, Properties property, int16_t value)
         getMotor(entity).setProperty(property, value);
         break;
 
+    case Entities_Head:
+        switch (property)
+        {
+        case Properties_Goal:  // TODO: for now just power
+            HeadGoalChanged = HeadGoal != value;
+            HeadGoal = value;
+            break;
+        
+        case Properties_Power:  // TODO: for now just power
+            HeadPowerChanged = HeadPower != value;
+            HeadPower = value;
+            break;
+        
+        default:
+            break;
+        }
+
     default:    // invalid enity
         break;
     }
@@ -193,9 +209,23 @@ int16_t getEntityProperty(Entities entity, Properties property)
     case Entities_RearMotor:
         return getMotor(entity).getProperty(property);
 
+    case Entities_Head:
+        switch (property)
+        {
+        case Properties_Goal:  // TODO: for now just power
+            return HeadGoal;
+        
+        case Properties_Power:  // TODO: for now just power
+            return HeadPower;
+        
+        default:
+            break;
+        }
+
     default:    // invalid enity
-        return -1;
+        break;
     }
+    return -1;
 }
 
 bool getEntityPropertyChanged(Entities entity, Properties property)
@@ -206,6 +236,27 @@ bool getEntityPropertyChanged(Entities entity, Properties property)
     case Entities_RightMotor:
     case Entities_RearMotor:
         return getMotor(entity).getPropertyChanged(property);
+
+    case Entities_Head:
+        switch (property)
+        {
+        case Properties_Goal:  // TODO: for now just power
+            {
+                bool changed = HeadGoalChanged;
+                HeadGoalChanged = false;
+                return changed;
+            }
+        
+        case Properties_Power:  // TODO: for now just power
+            {
+                bool changed = HeadPowerChanged;
+                HeadPowerChanged = false;
+                return changed;
+            }
+        
+        default:
+            break;
+        }
     }
     return false;
 }
@@ -237,6 +288,8 @@ Ctrl ctrls[] =
     { { 216,  59 }, 4, HX8357_WHITE, Entities_None,       Properties_RPM,   },
     { { 216,  85 }, 4, HX8357_WHITE, Entities_None,       Properties_Power, },
     { {  12,  32 }, 9, HX8357_GREEN, Entities_None,       Properties_ControlMode },
+    { {  12,  48 }, 4, HX8357_WHITE, Entities_Head,       Properties_Goal, },
+    { {  12,  54 }, 4, HX8357_WHITE, Entities_Head,       Properties_Power, },
 };
 
 Ctrl& getCtrl(Entities entity, Properties property)
