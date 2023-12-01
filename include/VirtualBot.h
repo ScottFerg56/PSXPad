@@ -2,7 +2,6 @@
 #define _VIRTUALBOT_H
 
 #include "\Projects\Rovio\RovioMotor\include\Packet.h"
-#include "VirtualMotor.h"
 #include "PSXPad.h"
 
 namespace VirtualBot

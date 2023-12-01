@@ -82,3 +82,27 @@ bool VirtualMotor::getPropertyChanged(Properties property)
     }
     return changed;
 }
+
+bool VirtualMotor::propertyToBot(Properties property)
+{
+    switch (property)
+    {
+    case Properties_Goal:
+    case Properties_DirectDrive:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool VirtualMotor::propertyFromBot(Properties property)
+{
+    switch (property)
+    {
+    case Properties_RPM:
+    case Properties_Power:
+        return true;
+    default:
+        return false;
+    }
+}

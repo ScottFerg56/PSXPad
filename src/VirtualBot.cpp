@@ -4,14 +4,13 @@
 #include <WiFi.h>
 #include "PSXPad.h"
 #include "Pad.h"
+#include "VirtualMotor.h"
+#include "VirtualHead.h"
 
 namespace VirtualBot
 {
 VirtualMotor Motors[3];
-int16_t HeadGoal = 0;
-bool HeadGoalChanged = false;
-int16_t HeadPower = 0;
-bool HeadPowerChanged = false;
+VirtualHead Head;
 
 enum ControlModes
 {
@@ -177,25 +176,8 @@ void setEntityProperty(Entities entity, Properties property, int16_t value)
     case Entities_RearMotor:
         getMotor(entity).setProperty(property, value);
         break;
-
     case Entities_Head:
-        switch (property)
-        {
-        case Properties_Goal:  // TODO: for now just power
-            HeadGoalChanged |= HeadGoal != value;
-            HeadGoal = value;
-            break;
-        
-        case Properties_Power:  // TODO: for now just power
-            HeadPowerChanged |= HeadPower != value;
-            HeadPower = value;
-            break;
-        
-        default:
-            break;
-        }
-
-    default:    // invalid enity
+        Head.setProperty(property, value);
         break;
     }
 }
@@ -208,22 +190,8 @@ int16_t getEntityProperty(Entities entity, Properties property)
     case Entities_RightMotor:
     case Entities_RearMotor:
         return getMotor(entity).getProperty(property);
-
     case Entities_Head:
-        switch (property)
-        {
-        case Properties_Goal:  // TODO: for now just power
-            return HeadGoal;
-        
-        case Properties_Power:  // TODO: for now just power
-            return HeadPower;
-        
-        default:
-            break;
-        }
-
-    default:    // invalid enity
-        break;
+        return Head.getProperty(property);
     }
     return -1;
 }
@@ -238,25 +206,21 @@ bool getEntityPropertyChanged(Entities entity, Properties property)
         return getMotor(entity).getPropertyChanged(property);
 
     case Entities_Head:
-        switch (property)
-        {
-        case Properties_Goal:  // TODO: for now just power
-            {
-                bool changed = HeadGoalChanged;
-                HeadGoalChanged = false;
-                return changed;
-            }
-        
-        case Properties_Power:  // TODO: for now just power
-            {
-                bool changed = HeadPowerChanged;
-                HeadPowerChanged = false;
-                return changed;
-            }
-        
-        default:
-            break;
-        }
+        return Head.getPropertyChanged(property);
+    }
+    return false;
+}
+
+bool getEntityPropertyToBot(Entities entity, Properties property)
+{
+    switch (entity)
+    {
+    case Entities_LeftMotor:
+    case Entities_RightMotor:
+    case Entities_RearMotor:
+        return getMotor(entity).propertyToBot(property);
+    case Entities_Head:
+        return Head.propertyToBot(property);
     }
     return false;
 }
@@ -288,8 +252,8 @@ Ctrl ctrls[] =
     { { 216,  59 }, 4, HX8357_WHITE, Entities_None,       Properties_RPM,   },
     { { 216,  85 }, 4, HX8357_WHITE, Entities_None,       Properties_Power, },
     { {  12,  32 }, 9, HX8357_GREEN, Entities_None,       Properties_ControlMode },
-    { {  12,  59 }, 4, HX8357_WHITE, Entities_Head,       Properties_Goal, },
-    { {  12,  85 }, 4, HX8357_WHITE, Entities_Head,       Properties_Power, },
+    { {  12,  59 }, 4, HX8357_WHITE, Entities_Head,       Properties_Power, },
+    { {  12,  85 }, 4, HX8357_WHITE, Entities_Head,       Properties_Position, },
 };
 
 Ctrl& getCtrl(Entities entity, Properties property)
@@ -452,12 +416,12 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
         case PadKeys_knob3Btn:
             if (x != 0)
             {
-                VirtualBot::setEntityProperty(Entities_Head, Properties_Goal, 0);
+                VirtualBot::setEntityProperty(Entities_Head, Properties_Power, 0);
                 Pad::setKnobValue(PadKeys_knob3, 0);
             }
             break;
         case PadKeys_knob3:
-            VirtualBot::setEntityProperty(Entities_Head, Properties_Goal, (int8_t)x);
+            VirtualBot::setEntityProperty(Entities_Head, Properties_Power, (int8_t)x);
             break;
         }
     }
@@ -491,13 +455,13 @@ void flush()
         {
             if (getEntityPropertyChanged(entity, prop))
             {
-                if (cnt >= len)
+                if (getEntityPropertyToBot(entity, prop))
                 {
-                    floge("packet buffer too small");
-                    break;
-                }
-                if (prop != Properties_RPM && prop != Properties_Power)   // skip readonly
-                {
+                    if (cnt >= len)
+                    {
+                        floge("packet buffer too small");
+                        break;
+                    }
                     packets[cnt].entity = entity;
                     packets[cnt].property = prop;
                     packets[cnt].value = getEntityProperty(entity, prop);

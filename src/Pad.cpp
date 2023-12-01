@@ -37,7 +37,7 @@ seesaw_NeoPixel SSPixel = seesaw_NeoPixel(4, 18, NEO_GRB + NEO_KHZ800);
 ScaledKnob Knob0(0, 12, -100, 100, 5);
 ScaledKnob Knob1(1, 14, -100, 100, 5);
 ScaledKnob Knob2(2, 17, -100, 100, 5);
-ScaledKnob Knob3(3,  9, -100, 100, 5);
+ScaledKnob Knob3(3,  9, -255, 255, 5);
 
 bool haveController = false;
 

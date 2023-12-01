@@ -27,6 +27,8 @@ public:
     void setProperty(Properties property, int16_t value);
     int16_t getProperty(Properties property);
     bool getPropertyChanged(Properties property);
+    bool propertyToBot(Properties property);
+    bool propertyFromBot(Properties property);
 };
 
 #endif // _VIRTUALMOTOR_H
