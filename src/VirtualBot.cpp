@@ -79,9 +79,9 @@ void Guidance()
     rpm2 = (int8_t)roundf(velW2 * rot2RPM);
     if (abs(rpm0) > 100 || abs(rpm1) > 100 || abs(rpm2) > 100)
         return;
-    VirtualBot::setEntityProperty(Entities_LeftMotor, Properties_Goal, -rpm0);
-    VirtualBot::setEntityProperty(Entities_RightMotor, Properties_Goal, rpm1);
-    VirtualBot::setEntityProperty(Entities_RearMotor, Properties_Goal, rpm2);
+    setEntityProperty(Entities_LeftMotor, Properties_Goal, -rpm0);
+    setEntityProperty(Entities_RightMotor, Properties_Goal, rpm1);
+    setEntityProperty(Entities_RearMotor, Properties_Goal, rpm2);
 }
 
 esp_now_peer_info_t peerInfo;
@@ -277,11 +277,6 @@ void drawCtrl(Ctrl& ctrl)
     if (ctrl.entity != Entities_None)
     {
         tft.printf("%*i", ctrl.width, getEntityProperty(ctrl.entity, ctrl.property));
-        // UNDONE: better way to reflect changes from bot!
-        if (ctrl.entity == Entities_Head && ctrl.property == Properties_Power)
-        {
-            Pad::setKnobValue(PadKeys_knob3, getEntityProperty(ctrl.entity, ctrl.property));
-        }
     }
     else
     {
@@ -400,13 +395,21 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
             velOw = -x * factorSpin * factorMode;
             Guidance();
             break;
+        case PadKeys_up:
+            // head up
+            setEntityProperty(Entities_Head, Properties_Power, (int16_t)roundf(x * 100.0f) / 255.0f);
+            break;
+        case PadKeys_down:
+            // head down
+            setEntityProperty(Entities_Head, Properties_Power, -(int16_t)roundf(x * 100.0f) / 255.0f);
+            break;
         case PadKeys_knob0Btn:
         case PadKeys_knob1Btn:
         case PadKeys_knob2Btn:
             if (x != 0)
             {
                 int ix = btn - PadKeys_knob0Btn;
-                VirtualBot::setEntityProperty((Entities)(Entities_LeftMotor + ix), Properties_Goal, 0);
+                setEntityProperty((Entities)(Entities_LeftMotor + ix), Properties_Goal, 0);
                 Pad::setKnobValue((PadKeys)(PadKeys_knob0 + ix), 0);
             }
             break;
@@ -415,19 +418,9 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
         case PadKeys_knob2:
             {
                 Entities entity = (Entities)(Entities_LeftMotor + (btn - PadKeys_knob0));
-                VirtualBot::setEntityProperty(entity, Properties_Goal, (int8_t)x);
+                setEntityProperty(entity, Properties_Goal, (int8_t)x);
             }
             break;    
-        case PadKeys_knob3Btn:
-            if (x != 0)
-            {
-                VirtualBot::setEntityProperty(Entities_Head, Properties_Power, 0);
-                Pad::setKnobValue(PadKeys_knob3, 0);
-            }
-            break;
-        case PadKeys_knob3:
-            VirtualBot::setEntityProperty(Entities_Head, Properties_Power, (int8_t)x);
-            break;
         }
     }
     else
@@ -441,7 +434,7 @@ void processKey(PadKeys btn, int16_t x, int16_t y)
             {
                 // while disabled, force knob to stay at current goals
                 Entities entity = (Entities)(Entities_LeftMotor + btn - PadKeys_knob0);
-                int8_t goal = VirtualBot::getEntityProperty(entity, Properties_Goal);
+                int8_t goal = getEntityProperty(entity, Properties_Goal);
                 Pad::setKnobValue(btn, goal);
             }
             break;    
