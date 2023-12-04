@@ -59,6 +59,7 @@ bool VirtualHead::propertyFromBot(Properties property)
     switch (property)
     {
     case Properties_Position:
+    case Properties_Power:
         return true;
     default:
         return false;

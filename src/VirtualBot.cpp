@@ -277,6 +277,11 @@ void drawCtrl(Ctrl& ctrl)
     if (ctrl.entity != Entities_None)
     {
         tft.printf("%*i", ctrl.width, getEntityProperty(ctrl.entity, ctrl.property));
+        // UNDONE: better way to reflect changes from bot!
+        if (ctrl.entity == Entities_Head && ctrl.property == Properties_Power)
+        {
+            Pad::setKnobValue(PadKeys_knob3, getEntityProperty(ctrl.entity, ctrl.property));
+        }
     }
     else
     {
