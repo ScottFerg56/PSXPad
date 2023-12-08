@@ -1,15 +1,22 @@
-#ifndef _ECHO_H
-#define _ECHO_H
+#ifndef _CONTROLLER_H
+#define _CONTROLLER_H
 
+#include <Arduino.h>
+#include "Domain.h"
 #include "PSXPad.h"
 
-namespace Echo
+namespace Controller
 {
+    /**
+     * @brief Serial print interesting values for plotting using the Teleplot VS Code extension
+     */
+    void DoPlot();
+
     /**
      * @brief Activate the UI page
      */
     void Activate();
-    
+
     /**
      * @brief Deactivate the UI page
      */
@@ -24,6 +31,13 @@ namespace Echo
      * @remark only joysticks will have a y value
      */
     void ProcessKey(PadKeys btn, int16_t x, int16_t y);
+
+    /**
+     * @brief     Process Property changes (from another remote Domain)
+     * @param     pe pointer to the Entity
+     * @param     pp pointer to the changed Property
+     */
+    void ProcessChange(Entity* pe, Property* pp);
 };
 
-#endif // _ECHO_H
+#endif // _CONTROLLER_H

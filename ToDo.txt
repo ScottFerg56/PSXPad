@@ -1,23 +1,26 @@
-code sharing and tighter coupling for 'virtual' entities
-    drive property change events from loop function
-        transmission handling
-        telemetry update
-        knobs update
+better scheduling mechanism for loop() 'clients'
+Loop() functions should track their own 'dmsec' since last call
+    use an 'Init' param to set desired interval
+better Telemetry positioning and labeling of Head properties
+track transmission failures
+    some threshold to determine absolute connection loss
+    controller display for lost connection
+    pings to restore connection??
+fix Log overwriting button menu
 direct mode factor changes
 explore RPM lower limit under load
 add accel motor setting?
 Freenove_ESP32_S3_WROOM_Board camera
 
 Rovio:
-    head up/down
     headlights
     top lights
     camera
+    9 DOF sensor
 
 UI Pages:
     Telemetry - always passthru - feedback from robot:
         direct drive
-        head position
         feedback on control mode(s) from robot controller
         voltages
         sensors:
