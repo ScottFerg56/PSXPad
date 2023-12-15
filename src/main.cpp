@@ -31,9 +31,9 @@ Entity* entities[5] = { &LeftMotor, &RightMotor, &RearMotor, &HeadX, nullptr };
 
 Domain VirtualBot = Domain(false, entities);
 
-// E8:9F:6D:22:02:EC
+// our Mac Address = {0xE8, 0x9F, 0x6D, 0x22, 0x02, 0xEC}
 
-uint8_t botMacAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xD7, 0xF8};
+uint8_t botMacAddress[] = {0xE8, 0x9F, 0x6D, 0x32, 0xDE, 0x2C};
 
 /**
  * @brief each menu item activates a different UI page

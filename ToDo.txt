@@ -12,6 +12,16 @@ explore RPM lower limit under load
 add accel motor setting?
 Freenove_ESP32_S3_WROOM_Board camera
 
+Rovio RobotController board:
+    change 200 ohm to 100
+    2mm boundary around card
+    change right angle sockets to straight
+    notch marking
+    move Feather forward away from notch
+    move components under Feather?
+    double Feather pads?
+    head position pot connector
+
 Rovio:
     headlights
     top lights
