@@ -7,6 +7,7 @@
 #include "Echo.h"
 #include "MotorBase.h"
 #include "HeadBase.h"
+#include "NavLightsBase.h"
 
 //
 // NOTE: These Entities might best be declared within the Domain subclass,
@@ -21,7 +22,8 @@ MotorBase LeftMotor =  MotorBase(EntityID_LeftMotor, "Left Motor");
 MotorBase RightMotor = MotorBase(EntityID_RightMotor, "Right Motor");
 MotorBase RearMotor =  MotorBase(EntityID_RearMotor, "Rear Motor");
 HeadBase HeadX = HeadBase(EntityID_Head, "Head");
-Entity* entities[5] = { &LeftMotor, &RightMotor, &RearMotor, &HeadX, nullptr };
+NavLightsBase NavLites = NavLightsBase(EntityID_NavLights, "Nav Lights");
+Entity* entities[6] = { &LeftMotor, &RightMotor, &RearMotor, &HeadX, &NavLites, nullptr };
 
 //class Bot : public Domain
 //{
@@ -263,8 +265,8 @@ void loop()
             }
         }
         Pad::Loop(&PadCallback);
-        VirtualBot.ProcessChanges(&ChgCallback);
     }
+    VirtualBot.ProcessChanges(&ChgCallback);
     // time slice for processing debug data plots
     dmsec = msec - timePlotLast;
     if (dmsec >= 1000)

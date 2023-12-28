@@ -1,26 +1,22 @@
-better scheduling mechanism for loop() 'clients'
-Loop() functions should track their own 'dmsec' since last call
-    use an 'Init' param to set desired interval
+eliminate Property Input/Output flags?
+    all get sync'd and ping pong until change settles out
+    may need readonly flag for server properties
+add table to Property class for converting values to string?
+move PSXPad TS Loop processing to separate namespace?
+
 better Telemetry positioning and labeling of Head properties
 track transmission failures
     some threshold to determine absolute connection loss
     controller display for lost connection
     pings to restore connection??
-fix Log overwriting button menu
 direct mode factor changes
 explore RPM lower limit under load
 add accel motor setting?
 Freenove_ESP32_S3_WROOM_Board camera
 
 Rovio RobotController board:
-    change 200 ohm to 100
-    2mm boundary around card
-    change right angle sockets to straight
-    notch marking
-    move Feather forward away from notch
-    move components under Feather?
-    double Feather pads?
-    head position pot connector
+    many connectors could fit on the upper back behind Feather
+    board boundary is more open for sides near top
 
 Rovio:
     headlights

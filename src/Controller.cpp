@@ -2,6 +2,7 @@
 #include "FLogger.h"
 #include "PSXPad.h"
 #include "Pad.h"
+#include "NavLightsBase.h"
 
 namespace Controller
 {
@@ -136,8 +137,9 @@ Ctrl ctrls[] =
     { { 216,  59 }, 4, HX8357_WHITE, EntityID_None,       PropertyID_None,  "RPM"   },
     { { 216,  85 }, 4, HX8357_WHITE, EntityID_None,       PropertyID_None,  "Power"  },
     { {  12,  32 }, 9, HX8357_GREEN, EntityID_None,       PropertyID_ControlMode, "Limited" },
-    { {  12,  59 }, 4, HX8357_WHITE, EntityID_Head,       PropertyID_Power, nullptr },
-    { {  12,  85 }, 4, HX8357_WHITE, EntityID_Head,       PropertyID_Position, nullptr },
+    { {  12,  59 }, 4, HX8357_WHITE, EntityID_Head,       PropertyID_Goal, nullptr },
+    { {  12,  85 }, 4, HX8357_WHITE, EntityID_Head,       PropertyID_Power, nullptr },
+    { {  12, 111 }, 4, HX8357_WHITE, EntityID_Head,       PropertyID_Position, nullptr },
 };
 
 /**
@@ -295,11 +297,11 @@ void ProcessKey(PadKeys btn, int16_t x, int16_t y)
             break;
         case PadKeys_up:
             // head up while pressed
-            VirtualBot.SetEntityPropertyValue(EntityID_Head, PropertyID_Power, (int16_t)roundf(x * 100.0f) / 255.0f);
+            VirtualBot.SetEntityPropertyValue(EntityID_Head, PropertyID_Goal, (int16_t)roundf(x * 100.0f) / 255.0f);
             break;
         case PadKeys_down:
             // head down while pressed
-            VirtualBot.SetEntityPropertyValue(EntityID_Head, PropertyID_Power, -(int16_t)roundf(x * 100.0f) / 255.0f);
+            VirtualBot.SetEntityPropertyValue(EntityID_Head, PropertyID_Goal, -(int16_t)roundf(x * 100.0f) / 255.0f);
             break;
         case PadKeys_knob0Btn:
         case PadKeys_knob1Btn:
@@ -322,7 +324,16 @@ void ProcessKey(PadKeys btn, int16_t x, int16_t y)
                 EntityID entity = (EntityID)(EntityID_LeftMotor + (btn - PadKeys_knob0));
                 VirtualBot.SetEntityPropertyValue(entity, PropertyID_Goal, (int8_t)x);
             }
-            break;    
+            break;
+        case PadKeys_triangle:
+            VirtualBot.SetEntityPropertyValue(EntityID_NavLights, PropertyID_Animation, Animation_Fwd);
+            break;
+        case PadKeys_r1:
+            VirtualBot.SetEntityPropertyValue(EntityID_NavLights, PropertyID_Animation, Animation_Green);
+            break;
+        case PadKeys_r2:
+            VirtualBot.SetEntityPropertyValue(EntityID_NavLights, PropertyID_Animation, Animation_Cylon);
+            break;
         }
     }
     else
