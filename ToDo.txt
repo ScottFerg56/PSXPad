@@ -1,3 +1,4 @@
+lower Head.Position resolution to reduce jitter
 eliminate Property Input/Output flags?
     all get sync'd and ping pong until change settles out
     may need readonly flag for server properties
